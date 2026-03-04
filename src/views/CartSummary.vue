@@ -137,7 +137,7 @@ function proceed() {
                 @click="proceed"
                 class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform"
             >
-                Continuar al pago →
+                Continuar →
             </button>
         </div>
     </div>

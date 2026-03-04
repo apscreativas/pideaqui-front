@@ -13,6 +13,57 @@ function goBack() {
     order.reset()
     router.push('/')
 }
+
+function mapsUrl(lat, lng) {
+    return `https://maps.google.com/?q=${lat},${lng}`
+}
+
+function resendWhatsapp() {
+    if (!order.confirmedOrderId || !order.branchWhatsapp || !summary) return
+
+    const typeLabels = { delivery: 'A domicilio', pickup: 'Recoger en local', dine_in: 'Comer en el local' }
+    const paymentLabels = { cash: 'Efectivo', terminal: 'Terminal bancaria', transfer: 'Transferencia (SPEI)' }
+
+    const itemLines = summary.items.map((item) => {
+        const mods = item.modifiers?.length > 0 ? ` (${item.modifiers.map((m) => m.name).join(', ')})` : ''
+        const notes = item.notes ? ` - Nota: ${item.notes}` : ''
+        return `• ${item.quantity}x ${item.product_name}${mods}${notes} - $${item.item_total.toFixed(2)}`
+    }).join('\n')
+
+    let deliveryLines = ''
+    if (order.deliveryType === 'delivery') {
+        deliveryLines = `🚗 *Tipo:* A domicilio\n`
+            + `📍 *Dirección:* ${order.address}${order.addressReferences ? ' — ' + order.addressReferences : ''}\n`
+            + `🏪 *Sucursal:* ${order.branchName}\n`
+            + (order.distanceKm ? `📏 Distancia: ${order.distanceKm.toFixed(1)} km\n` : '')
+            + (order.latitude && order.longitude ? `📌 Ubicación: ${mapsUrl(order.latitude, order.longitude)}\n` : '')
+    } else {
+        deliveryLines = `🏪 *Tipo:* ${typeLabels[order.deliveryType]}\n`
+            + `📍 *Sucursal:* ${order.branchName}\n`
+            + (order.branchAddress ? `🗺️ ${order.branchAddress}\n` : '')
+            + (order.branchLatitude && order.branchLongitude ? `📌 Ubicación: ${mapsUrl(order.branchLatitude, order.branchLongitude)}\n` : '')
+    }
+
+    const scheduledLine = order.scheduledAt
+        ? `🕐 Programado para: ${new Date(order.scheduledAt).toLocaleString('es-MX')}`
+        : '🕐 Lo antes posible'
+
+    const paymentLine = paymentLabels[order.paymentMethod] ?? order.paymentMethod
+
+    const message = encodeURIComponent(
+        `*Pedido #${order.confirmedOrderId} — GuisoGo*\n\n` +
+        `👤 *Cliente:* ${order.customerName} | ${order.customerPhone}\n\n` +
+        `🛒 *Pedido:*\n${itemLines}\n\n` +
+        `${deliveryLines}` +
+        `${scheduledLine}\n` +
+        `💳 *Pago:* ${paymentLine}\n\n` +
+        `*Subtotal:* $${summary.subtotal.toFixed(2)}\n` +
+        `*Envío:* $${summary.deliveryCost.toFixed(2)}\n` +
+        `*Total: $${summary.total.toFixed(2)}*`,
+    )
+
+    window.open(`https://wa.me/${order.branchWhatsapp}?text=${message}`, '_blank')
+}
 </script>
 
 <template>
@@ -110,7 +161,15 @@ function goBack() {
 
         <!-- Footer -->
         <footer class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-6 flex flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-t-xl z-20">
-            <div class="max-w-md mx-auto w-full">
+            <div class="max-w-md mx-auto w-full flex flex-col gap-3">
+                <button
+                    v-if="order.branchWhatsapp && order.confirmedOrderId"
+                    @click="resendWhatsapp"
+                    class="w-full h-12 rounded-full bg-[#25D366] hover:bg-[#1ebe57] text-white font-bold text-base tracking-wide shadow-lg shadow-[#25D366]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                    <span class="material-symbols-outlined text-xl">chat</span>
+                    Reenviar por WhatsApp
+                </button>
                 <button
                     @click="goBack"
                     class="w-full h-12 rounded-full bg-[#FF5722] hover:bg-[#e64a19] text-white font-bold text-base tracking-wide shadow-lg shadow-[#FF5722]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"

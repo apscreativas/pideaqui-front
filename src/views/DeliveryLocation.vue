@@ -29,7 +29,8 @@ const activeTypes = computed(() => {
 const selectedType = ref(null)
 
 onMounted(() => {
-    selectedType.value = activeTypes.value[0] ?? 'delivery'
+    const firstType = activeTypes.value[0]
+    selectedType.value = firstType ?? 'pickup'
 
     // Pre-fill from cookie
     const cookie = getCustomerCookie()
@@ -40,8 +41,8 @@ onMounted(() => {
         addressReferences.value = cookie.address_references ?? ''
         latitude.value = cookie.latitude ?? null
         longitude.value = cookie.longitude ?? null
-    } else {
-        // No saved location — auto-request GPS
+    } else if (firstType === 'delivery') {
+        // No saved location — auto-request GPS only if delivery is available
         requestGps()
     }
 })

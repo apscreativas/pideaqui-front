@@ -71,7 +71,7 @@ function proceed() {
                                     @click="cart.removeItem(index)"
                                     class="shrink-0 w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-400"
                                 >
-                                    <span class="material-symbols-outlined text-base">close</span>
+                                    <span class="material-symbols-outlined text-base">delete</span>
                                 </button>
                             </div>
 

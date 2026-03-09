@@ -77,7 +77,8 @@ function resendWhatsapp() {
         `*Total: $${summary.total.toFixed(2)}*`,
     )
 
-    window.open(`https://wa.me/${order.branchWhatsapp}?text=${message}`, '_blank')
+    const sanitizedWhatsapp = order.branchWhatsapp.replace(/[^\d+]/g, '')
+    window.open(`https://wa.me/${sanitizedWhatsapp}?text=${message}`, '_blank')
 }
 </script>
 

@@ -82,8 +82,11 @@ async function initMap() {
             styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }],
         })
 
-        // Emit center coordinates when map stops moving
+        // Only emit coordinates after user interacts with the map (or if GPS coords were provided)
+        let userInteracted = hasCoords
+        googleMap.addListener('dragstart', () => { userInteracted = true })
         googleMap.addListener('idle', () => {
+            if (!userInteracted) { return }
             const center = googleMap.getCenter()
             emit('update:lat', center.lat())
             emit('update:lng', center.lng())

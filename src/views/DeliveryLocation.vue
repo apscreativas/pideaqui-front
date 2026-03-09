@@ -146,11 +146,11 @@ async function proceed() {
 const branches = computed(() => restaurantStore.restaurant?.branches ?? [])
 const selectedBranch = ref(null)
 
-onMounted(() => {
-    if (branches.value.length === 1) {
-        selectedBranch.value = branches.value[0]
+watch(branches, (b) => {
+    if (b.length === 1 && !selectedBranch.value) {
+        selectedBranch.value = b[0]
     }
-})
+}, { immediate: true })
 
 const typeLabels = {
     delivery: { icon: 'delivery_dining', label: 'A domicilio' },
@@ -178,19 +178,25 @@ const timeSlots = computed(() => {
     // Start from next 30-min mark at least 30 min from now
     const start = new Date(now)
     start.setMinutes(start.getMinutes() + 30)
-    // Round up to next 30-min
+    // Round up to next 30-min boundary (skip if already on one)
     const mins = start.getMinutes()
-    start.setMinutes(mins <= 30 ? 30 : 60, 0, 0)
-    if (mins > 30) { start.setHours(start.getHours()) }
+    if (mins % 30 !== 0) {
+        start.setMinutes(mins <= 30 ? 30 : 60, 0, 0)
+    } else {
+        start.setSeconds(0, 0)
+    }
 
     // If start is before opening, jump to opening
     const openTime = new Date(now)
     openTime.setHours(openHour, openMin, 0, 0)
     if (start < openTime) { start.setTime(openTime.getTime()) }
 
-    // Close time
+    // Close time (handle overnight schedules like 18:00-02:00)
     const close = new Date(now)
     close.setHours(closeHour, closeMin, 0, 0)
+    if (close <= openTime) {
+        close.setDate(close.getDate() + 1)
+    }
 
     const slots = []
     const cursor = new Date(start)
@@ -230,7 +236,7 @@ const timeSlots = computed(() => {
                 <button
                     v-for="type in activeTypes"
                     :key="type"
-                    @click="selectedType = type; deliveryError = null"
+                    @click="selectedType = type; deliveryError = null; if (type === 'delivery' && !gpsResolved) requestGps()"
                     class="flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border transition-all text-sm font-medium"
                     :class="selectedType === type
                         ? 'bg-[#FF5722]/10 border-[#FF5722] text-[#FF5722]'

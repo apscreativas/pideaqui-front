@@ -37,69 +37,11 @@ onMounted(() => {
     }
 })
 
-function mapsUrl(lat, lng) {
-    return `https://maps.google.com/?q=${lat},${lng}`
-}
-
-function buildWhatsappMessage(orderId) {
-    const typeLabels = { delivery: 'A domicilio', pickup: 'Recoger en local', dine_in: 'Comer en el local' }
-
-    const itemLines = cart.items.map((item) => {
-        const mods = item.modifiers.length > 0 ? ` (${item.modifiers.map((m) => m.name).join(', ')})` : ''
-        const notes = item.notes ? ` - Nota: ${item.notes}` : ''
-        return `• ${item.quantity}x ${item.product_name}${mods}${notes} - $${item.item_total.toFixed(2)}`
-    }).join('\n')
-
-    let deliveryLines = ''
-    if (order.deliveryType === 'delivery') {
-        const fullAddress = `${order.addressStreet} #${order.addressNumber}, Col. ${order.addressColony}`
-        deliveryLines = `🚗 *Tipo:* A domicilio\n`
-            + `📍 *Dirección:* ${fullAddress}${order.addressReferences ? ' — ' + order.addressReferences : ''}\n`
-            + `🏪 *Sucursal:* ${order.branchName}\n`
-            + (order.distanceKm ? `📏 Distancia: ${order.distanceKm.toFixed(1)} km\n` : '')
-            + (order.latitude && order.longitude ? `📌 Ubicación: ${mapsUrl(order.latitude, order.longitude)}\n` : '')
-    } else {
-        deliveryLines = `🏪 *Tipo:* ${typeLabels[order.deliveryType]}\n`
-            + `📍 *Sucursal:* ${order.branchName}\n`
-            + (order.branchAddress ? `🗺️ ${order.branchAddress}\n` : '')
-            + (order.branchLatitude && order.branchLongitude ? `📌 Ubicación: ${mapsUrl(order.branchLatitude, order.branchLongitude)}\n` : '')
-    }
-
-    const scheduledLine = order.scheduledAt
-        ? `🕐 Programado para: ${new Date(order.scheduledAt).toLocaleString('es-MX')}`
-        : '🕐 Lo antes posible'
-
-    const paymentLine = { cash: 'Efectivo', terminal: 'Terminal bancaria', transfer: 'Transferencia (SPEI)' }[selectedPaymentMethod.value] ?? selectedPaymentMethod.value
-
-    let paymentExtra = ''
-    if (selectedPaymentMethod.value === 'cash' && cashAmount.value) {
-        const amt = parseFloat(cashAmount.value)
-        paymentExtra = `\n💵 *Paga con:* $${amt.toFixed(2)}`
-        const change = amt - total.value
-        if (change > 0) { paymentExtra += `\n🔄 *Cambio:* $${change.toFixed(2)}` }
-    }
-    if (selectedPaymentMethod.value === 'transfer' && selectedPmDetails.value) {
-        const pm = selectedPmDetails.value
-        paymentExtra = `\n🏦 *Banco:* ${pm.bank_name}`
-            + `\n👤 *Titular:* ${pm.account_holder}`
-            + `\n📋 *CLABE:* ${pm.clabe}`
-    }
-
-    return encodeURIComponent(
-        `*Pedido #${orderId} — GuisoGo*\n\n` +
-        `👤 *Cliente:* ${customerName.value} | ${customerPhone.value}\n\n` +
-        `🛒 *Pedido:*\n${itemLines}\n\n` +
-        `${deliveryLines}` +
-        `${scheduledLine}\n` +
-        `💳 *Pago:* ${paymentLine}${paymentExtra}\n\n` +
-        `*Subtotal:* $${cart.subtotal.toFixed(2)}\n` +
-        `*Envío:* $${order.deliveryCost.toFixed(2)}\n` +
-        `*Total: $${total.value.toFixed(2)}*`,
-    )
-}
 
 async function confirm() {
+    if (submitting.value) { return }
     if (!customerName.value || !customerPhone.value || !selectedPaymentMethod.value) { return }
+    if (selectedPaymentMethod.value === 'cash' && cashAmount.value && parseFloat(cashAmount.value) < total.value) { return }
 
     submitting.value = true
     submitError.value = null
@@ -148,6 +90,7 @@ async function confirm() {
         const { data } = await api.post('/api/orders', payload)
         const orderId = data.data.order_id
         const whatsapp = data.data.branch_whatsapp
+        const whatsappMessage = data.data.whatsapp_message
 
         // Save customer data to cookie
         setCustomerCookie({
@@ -171,13 +114,14 @@ async function confirm() {
             ? { bank_name: selectedPmDetails.value.bank_name, account_holder: selectedPmDetails.value.account_holder, clabe: selectedPmDetails.value.clabe }
             : null
 
-        // Open WhatsApp — use pre-opened window to avoid popup blocker
-        const message = buildWhatsappMessage(orderId)
+        // Open WhatsApp — use backend-generated message (single source of truth)
+        const sanitizedWhatsapp = whatsapp.replace(/[^\d+]/g, '')
+        const waUrl = `https://wa.me/${sanitizedWhatsapp}?text=${encodeURIComponent(whatsappMessage)}`
         if (whatsappWin) {
-            whatsappWin.location.href = `https://wa.me/${whatsapp}?text=${message}`
+            whatsappWin.location.href = waUrl
         } else {
             // Popups blocked — redirect current tab as fallback
-            window.location.href = `https://wa.me/${whatsapp}?text=${message}`
+            window.location.href = waUrl
         }
 
         order.setOrderSummary(cart.items, cart.subtotal, order.deliveryCost)
@@ -226,6 +170,7 @@ const selectedPmDetails = computed(() =>
                             <input
                                 v-model="customerName"
                                 type="text"
+                                maxlength="100"
                                 placeholder="Juan Pérez"
                                 class="flex-1 bg-transparent text-sm focus:outline-none"
                             />
@@ -331,9 +276,10 @@ const selectedPmDetails = computed(() =>
                             class="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30"
                         />
                     </div>
-                    <p v-if="cashAmount && cashAmount < total" class="text-xs text-red-500 mt-1">El monto debe ser igual o mayor al total (${{ total.toFixed(2) }})</p>
-                    <p v-else-if="cashAmount && cashAmount >= total" class="text-xs text-gray-400 mt-1">Cambio: ${{ (cashAmount - total).toFixed(2) }}</p>
-                    <p class="text-xs text-gray-400 mt-1" v-if="!cashAmount">Opcional — para que el repartidor lleve cambio exacto.</p>
+                    <p v-if="cashAmount && parseFloat(cashAmount) <= 0" class="text-xs text-red-500 mt-1">El monto debe ser mayor a cero.</p>
+                    <p v-else-if="cashAmount && parseFloat(cashAmount) < total" class="text-xs text-red-500 mt-1">El monto debe ser igual o mayor al total (${{ total.toFixed(2) }})</p>
+                    <p v-else-if="cashAmount && parseFloat(cashAmount) >= total" class="text-xs text-gray-400 mt-1">Cambio: ${{ (parseFloat(cashAmount) - total).toFixed(2) }}</p>
+                    <p v-if="!cashAmount" class="text-xs text-gray-400 mt-1">Opcional — para que el repartidor lleve cambio exacto.</p>
                 </div>
 
                 <!-- Transfer bank details -->
@@ -399,7 +345,7 @@ const selectedPmDetails = computed(() =>
         <div class="fixed bottom-5 left-4 right-4 max-w-md mx-auto">
             <button
                 @click="confirm"
-                :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting"
+                :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && cashAmount && parseFloat(cashAmount) < total)"
                 class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
             >
                 <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">send</span>

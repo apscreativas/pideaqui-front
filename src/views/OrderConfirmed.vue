@@ -41,7 +41,7 @@ function resendWhatsapp() {
     } else {
         deliveryLines = `🏪 *Tipo:* ${typeLabels[order.deliveryType]}\n`
             + `📍 *Sucursal:* ${order.branchName}\n`
-            + (order.branchAddress ? `🗺️ ${order.branchAddress}\n` : '')
+            + (order.branchAddress ? `🏠 ${order.branchAddress}\n` : '')
             + (order.branchLatitude && order.branchLongitude ? `📌 Ubicación: ${mapsUrl(order.branchLatitude, order.branchLongitude)}\n` : '')
     }
 
@@ -66,7 +66,7 @@ function resendWhatsapp() {
     }
 
     const message = encodeURIComponent(
-        `*Pedido #${order.confirmedOrderId} — GuisoGo*\n\n` +
+        `*Pedido #${order.confirmedOrderId} — PideAqui*\n\n` +
         `👤 *Cliente:* ${order.customerName} | ${order.customerPhone}\n\n` +
         `🛒 *Pedido:*\n${itemLines}\n\n` +
         `${deliveryLines}` +
@@ -77,7 +77,8 @@ function resendWhatsapp() {
         `*Total: $${summary.total.toFixed(2)}*`,
     )
 
-    window.open(`https://wa.me/${order.branchWhatsapp}?text=${message}`, '_blank')
+    const sanitizedWhatsapp = order.branchWhatsapp.replace(/[^\d+]/g, '')
+    window.open(`https://wa.me/${sanitizedWhatsapp}?text=${message}`, '_blank')
 }
 </script>
 
@@ -176,7 +177,7 @@ function resendWhatsapp() {
 
         <!-- Footer -->
         <footer class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-6 flex flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-t-xl z-20">
-            <div class="max-w-md mx-auto w-full flex flex-col gap-3">
+            <div class="max-w-md md:max-w-lg mx-auto w-full flex flex-col gap-3">
                 <button
                     v-if="order.branchWhatsapp && order.confirmedOrderId"
                     @click="resendWhatsapp"

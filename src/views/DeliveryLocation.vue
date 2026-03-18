@@ -12,10 +12,18 @@ const router = useRouter()
 const restaurantStore = useRestaurantStore()
 const cart = useCartStore()
 const order = useOrderStore()
+const cookie = getCustomerCookie()
 
 const restaurant = computed(() => restaurantStore.restaurant)
+const branches = computed(() => restaurantStore.restaurant?.branches ?? [])
+const noBranches = computed(() => branches.value.length === 0)
 
-// Active delivery type — only show what the restaurant allows
+const typeLabels = {
+    delivery: { label: 'A domicilio', icon: 'delivery_dining' },
+    pickup: { label: 'Recoger', icon: 'shopping_bag' },
+    dine_in: { label: 'En local', icon: 'restaurant' },
+}
+
 const activeTypes = computed(() => {
     const r = restaurant.value
     if (!r) { return [] }
@@ -26,85 +34,133 @@ const activeTypes = computed(() => {
     return types
 })
 
-const selectedType = ref(null)
+const selectedType = ref(order.deliveryType || activeTypes.value[0] || 'delivery')
+const selectedBranch = ref(null)
 
-// Delivery fields
-const addressStreet = ref('')
-const addressNumber = ref('')
-const addressColony = ref('')
-const addressReferences = ref('')
-const latitude = ref(null)
-const longitude = ref(null)
-const scheduledAt = ref(null)
+const addressStreet = ref(order.addressStreet || cookie?.address_street || '')
+const addressNumber = ref(order.addressNumber || cookie?.address_number || '')
+const addressColony = ref(order.addressColony || cookie?.address_colony || '')
+const addressReferences = ref(order.addressReferences || cookie?.address_references || '')
+const latitude = ref(order.latitude || cookie?.latitude || null)
+const longitude = ref(order.longitude || cookie?.longitude || null)
 
-// State
-const proceeding = ref(false)
-const deliveryError = ref(null)
-
-// GPS
-const locating = ref(false)
+const gpsResolved = ref(!!latitude.value)
 const gpsError = ref(null)
-const gpsResolved = ref(false)
+const locating = ref(false)
+const deliveryError = ref(null)
+const proceeding = ref(false)
+
+// Schedule
+const scheduledAt = ref(order.scheduledAt || null)
+const showSchedule = ref(!!scheduledAt.value)
+
+const todaySchedule = computed(() => {
+    const schedules = restaurant.value?.schedules
+    if (!schedules?.length) { return null }
+    const today = new Date().getDay()
+    return schedules.find((s) => s.day_of_week === today) ?? null
+})
+
+const timeSlots = computed(() => {
+    const schedule = todaySchedule.value
+    if (!schedule || schedule.is_closed) { return [] }
+
+    const [openH, openM] = (schedule.opens_at || '00:00').split(':').map(Number)
+    const [closeH, closeM] = (schedule.closes_at || '23:59').split(':').map(Number)
+
+    const now = new Date()
+    const slots = []
+    const d = new Date(now)
+    d.setSeconds(0, 0)
+
+    // Round to next 30-min increment + 30 min buffer
+    const mins = d.getMinutes()
+    d.setMinutes(mins + (30 - (mins % 30)) + 30)
+
+    const endDate = new Date(now)
+    endDate.setHours(closeH, closeM, 0, 0)
+
+    while (d <= endDate && slots.length < 48) {
+        const h = d.getHours()
+        const m = d.getMinutes()
+        if (h > openH || (h === openH && m >= openM)) {
+            const iso = new Date(d).toISOString()
+            const label = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+            slots.push({ value: iso, label })
+        }
+        d.setMinutes(d.getMinutes() + 30)
+    }
+    return slots
+})
+
 function requestGps() {
     if (!navigator.geolocation) {
-        gpsError.value = 'Tu navegador no soporta geolocalización.'
+        gpsError.value = 'Tu navegador no soporta geolocalizacion.'
         gpsResolved.value = true
         return
     }
     locating.value = true
     gpsError.value = null
+
     navigator.geolocation.getCurrentPosition(
         (pos) => {
             latitude.value = pos.coords.latitude
             longitude.value = pos.coords.longitude
-            locating.value = false
             gpsResolved.value = true
-            gpsError.value = null
+            locating.value = false
         },
         (err) => {
             locating.value = false
             gpsResolved.value = true
             if (err.code === 1) {
-                gpsError.value = 'Permiso de ubicación denegado. Actívalo en los ajustes de tu navegador o arrastra el pin en el mapa.'
+                gpsError.value = 'Permiso de ubicacion denegado. Puedes mover el pin manualmente en el mapa.'
             } else if (err.code === 2) {
-                gpsError.value = 'No se pudo obtener tu ubicación. Intenta de nuevo o arrastra el pin en el mapa.'
+                gpsError.value = 'No se pudo obtener tu ubicacion. Intenta de nuevo o mueve el pin en el mapa.'
             } else {
-                gpsError.value = 'Tiempo de espera agotado. Intenta de nuevo o arrastra el pin en el mapa.'
+                gpsError.value = 'Tiempo de espera agotado. Intenta de nuevo o mueve el pin en el mapa.'
+            }
+            if (!latitude.value) {
+                latitude.value = 19.4326
+                longitude.value = -99.1332
             }
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     )
 }
 
-// Set default type once restaurant data is available (may load async)
-watch(activeTypes, (types) => {
-    if (types.length && !selectedType.value) {
-        selectedType.value = types[0]
-        if (types[0] === 'delivery') {
-            requestGps()
-        }
-    }
-}, { immediate: true })
-
 onMounted(() => {
-    // Pre-fill from cookie
-    const cookie = getCustomerCookie()
-    if (cookie) {
-        addressStreet.value = cookie.address_street ?? ''
-        addressNumber.value = cookie.address_number ?? ''
-        addressColony.value = cookie.address_colony ?? ''
-        addressReferences.value = cookie.address_references ?? ''
+    if (selectedType.value === 'delivery' && !gpsResolved.value) {
+        requestGps()
+    }
+    if (branches.value.length === 1 && (selectedType.value === 'pickup' || selectedType.value === 'dine_in')) {
+        selectedBranch.value = branches.value[0]
     }
 })
 
-async function proceed() {
+watch(selectedType, (type) => {
+    if (type === 'delivery' && !gpsResolved.value) {
+        requestGps()
+    }
+    if ((type === 'pickup' || type === 'dine_in') && branches.value.length === 1) {
+        selectedBranch.value = branches.value[0]
+    }
+})
+
+const canProceed = computed(() => {
+    if (noBranches.value || proceeding.value) { return false }
     if (selectedType.value === 'delivery') {
-        if (!addressStreet.value || !addressNumber.value || !addressColony.value || !latitude.value || !longitude.value) { return }
+        return !!(addressStreet.value && addressNumber.value && addressColony.value && latitude.value && longitude.value)
+    }
+    return !!selectedBranch.value
+})
 
-        proceeding.value = true
-        deliveryError.value = null
+async function proceed() {
+    if (!canProceed.value) { return }
+    proceeding.value = true
+    deliveryError.value = null
 
-        try {
+    try {
+        if (selectedType.value === 'delivery') {
             const { data } = await api.post('/api/delivery/calculate', {
                 latitude: latitude.value,
                 longitude: longitude.value,
@@ -112,12 +168,16 @@ async function proceed() {
             const result = data.data
 
             if (!result.is_in_coverage) {
-                deliveryError.value = `Tu ubicación está a ${result.distance_km} km, fuera del área de cobertura.`
-                proceeding.value = false
+                deliveryError.value = 'No hay cobertura de entrega para esta ubicacion.'
                 return
             }
 
-            order.setDelivery('delivery', result, {
+            order.setDelivery('delivery', {
+                id: result.branch_id,
+                name: result.branch_name,
+                whatsapp: result.branch_whatsapp,
+                address: result.branch_address,
+            }, {
                 distance_km: result.distance_km,
                 delivery_cost: result.delivery_cost,
                 address_street: addressStreet.value,
@@ -127,84 +187,28 @@ async function proceed() {
                 latitude: latitude.value,
                 longitude: longitude.value,
             })
-        } catch (err) {
-            deliveryError.value = err.response?.data?.message ?? 'No hay cobertura en tu zona.'
-            proceeding.value = false
-            return
+        } else {
+            const branch = selectedBranch.value
+            order.setDelivery(selectedType.value, {
+                id: branch.id,
+                name: branch.name,
+                whatsapp: branch.whatsapp,
+                address: branch.address,
+            })
         }
-
+        order.scheduledAt = scheduledAt.value
+        router.push('/payment')
+    } catch (err) {
+        const msg = err.response?.data?.message || err.response?.data?.errors?.delivery_cost?.[0]
+        deliveryError.value = msg || 'No hay cobertura de entrega para esta ubicacion.'
+    } finally {
         proceeding.value = false
-    } else if (selectedType.value === 'pickup' || selectedType.value === 'dine_in') {
-        if (!selectedBranch.value) { return }
-        order.setDelivery(selectedType.value, selectedBranch.value, { delivery_cost: 0 })
     }
-    order.scheduledAt = scheduledAt.value
-    router.push('/payment')
 }
 
-// Pickup / dine_in branch selection
-const branches = computed(() => restaurantStore.restaurant?.branches ?? [])
-const selectedBranch = ref(null)
-
-onMounted(() => {
-    if (branches.value.length === 1) {
-        selectedBranch.value = branches.value[0]
-    }
-})
-
-const typeLabels = {
-    delivery: { icon: 'delivery_dining', label: 'A domicilio' },
-    pickup: { icon: 'shopping_bag', label: 'Recoger' },
-    dine_in: { icon: 'restaurant', label: 'Comer aqui' },
+function formatPrice(v) {
+    return '$' + Number(v).toFixed(2)
 }
-
-const showSchedule = ref(false)
-
-const timeSlots = computed(() => {
-    const now = new Date()
-    const today = now.getDay() // 0=Sun..6=Sat
-
-    // Use restaurant-level schedules
-    const schedules = restaurant.value?.schedules ?? []
-    const schedule = schedules.find((s) => s.day_of_week === today)
-
-    let openHour = 8, openMin = 0, closeHour = 22, closeMin = 0
-    if (schedule && !schedule.is_closed && schedule.opens_at && schedule.closes_at) {
-        const [oh, om] = schedule.opens_at.split(':').map(Number)
-        const [ch, cm] = schedule.closes_at.split(':').map(Number)
-        openHour = oh; openMin = om; closeHour = ch; closeMin = cm
-    }
-
-    // Start from next 30-min mark at least 30 min from now
-    const start = new Date(now)
-    start.setMinutes(start.getMinutes() + 30)
-    // Round up to next 30-min
-    const mins = start.getMinutes()
-    start.setMinutes(mins <= 30 ? 30 : 60, 0, 0)
-    if (mins > 30) { start.setHours(start.getHours()) }
-
-    // If start is before opening, jump to opening
-    const openTime = new Date(now)
-    openTime.setHours(openHour, openMin, 0, 0)
-    if (start < openTime) { start.setTime(openTime.getTime()) }
-
-    // Close time
-    const close = new Date(now)
-    close.setHours(closeHour, closeMin, 0, 0)
-
-    const slots = []
-    const cursor = new Date(start)
-    while (cursor < close) {
-        const h = cursor.getHours()
-        const m = cursor.getMinutes()
-        const label = `${h}:${String(m).padStart(2, '0')}`
-        const pad = (n) => String(n).padStart(2, '0')
-        const iso = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}T${pad(h)}:${pad(m)}`
-        slots.push({ label, value: iso })
-        cursor.setMinutes(cursor.getMinutes() + 30)
-    }
-    return slots
-})
 </script>
 
 <template>
@@ -212,7 +216,7 @@ const timeSlots = computed(() => {
 
         <!-- Header -->
         <header class="sticky top-0 z-10 bg-[#f6f8f7] border-b border-gray-100 px-4 py-3">
-            <div class="max-w-md mx-auto flex items-center gap-3">
+            <div class="max-w-6xl mx-auto flex items-center gap-3">
                 <button
                     @click="router.back()"
                     class="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-100"
@@ -223,14 +227,26 @@ const timeSlots = computed(() => {
             </div>
         </header>
 
-        <div class="max-w-md mx-auto px-4 py-5 pb-36">
+        <div class="max-w-6xl mx-auto px-4 py-5 pb-40 md:pb-8">
+            <div class="md:flex md:gap-8">
+
+            <!-- Left column: form -->
+            <div class="md:flex-1 min-w-0">
+
+            <!-- No branches warning -->
+            <div v-if="noBranches" class="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-700 mb-4">
+                <div class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-amber-500 text-lg shrink-0">warning</span>
+                    Este restaurante aun no tiene sucursales configuradas.
+                </div>
+            </div>
 
             <!-- Delivery type selector -->
             <div class="flex gap-2 mb-6">
                 <button
                     v-for="type in activeTypes"
                     :key="type"
-                    @click="selectedType = type; deliveryError = null"
+                    @click="selectedType = type; deliveryError = null; if (type === 'delivery' && !gpsResolved) requestGps()"
                     class="flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border transition-all text-sm font-medium"
                     :class="selectedType === type
                         ? 'bg-[#FF5722]/10 border-[#FF5722] text-[#FF5722]'
@@ -246,8 +262,6 @@ const timeSlots = computed(() => {
 
             <!-- Delivery: address form -->
             <template v-if="selectedType === 'delivery'">
-
-                <!-- GPS button -->
                 <button
                     @click="requestGps"
                     class="w-full flex items-center gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3 mb-3 text-sm font-medium text-gray-700"
@@ -257,7 +271,6 @@ const timeSlots = computed(() => {
                     <span>{{ locating ? 'Obteniendo ubicacion...' : latitude ? 'Ubicacion obtenida' : 'Usar mi ubicacion actual' }}</span>
                 </button>
 
-                <!-- GPS error -->
                 <div v-if="gpsError" class="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-700 mb-3">
                     <div class="flex items-start gap-2">
                         <span class="material-symbols-outlined text-amber-500 text-lg shrink-0">warning</span>
@@ -265,11 +278,11 @@ const timeSlots = computed(() => {
                     </div>
                 </div>
 
-                <!-- Interactive map (renders after GPS resolves) -->
+                <!-- Map -->
                 <div class="mb-4">
-                    <div v-if="!gpsResolved" class="w-full h-56 rounded-2xl bg-gray-100 flex flex-col items-center justify-center">
+                    <div v-if="!gpsResolved" class="w-full h-56 md:h-72 rounded-2xl bg-gray-100 flex flex-col items-center justify-center">
                         <div class="w-8 h-8 rounded-full border-4 border-gray-200 border-t-[#FF5722] animate-spin mb-2"></div>
-                        <p class="text-xs text-gray-500">Obteniendo tu ubicación...</p>
+                        <p class="text-xs text-gray-500">Obteniendo tu ubicacion...</p>
                     </div>
                     <MapPicker
                         v-else
@@ -280,50 +293,30 @@ const timeSlots = computed(() => {
                     />
                 </div>
 
-                <!-- Address fields -->
-                <div class="space-y-3 mb-4">
+                <!-- Address fields — 2-col grid on desktop -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Calle</label>
-                        <input
-                            v-model="addressStreet"
-                            type="text"
-                            maxlength="255"
-                            placeholder="Av. Alvaro Obregon"
-                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30"
-                        />
+                        <input v-model="addressStreet" type="text" maxlength="255" placeholder="Av. Alvaro Obregon"
+                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30" />
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Numero exterior</label>
-                        <input
-                            v-model="addressNumber"
-                            type="text"
-                            maxlength="50"
-                            placeholder="154"
-                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30"
-                        />
+                        <input v-model="addressNumber" type="text" maxlength="50" placeholder="154"
+                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30" />
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Colonia</label>
-                        <input
-                            v-model="addressColony"
-                            type="text"
-                            maxlength="255"
-                            placeholder="Roma Norte"
-                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30"
-                        />
+                        <input v-model="addressColony" type="text" maxlength="255" placeholder="Roma Norte"
+                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30" />
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Referencias</label>
-                        <textarea
-                            v-model="addressReferences"
-                            placeholder="Entre calles, color de casa, numero de depto..."
-                            rows="2"
-                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30"
-                        ></textarea>
+                        <input v-model="addressReferences" type="text" placeholder="Entre calles, color de casa..."
+                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30" />
                     </div>
                 </div>
 
-                <!-- Error -->
                 <div v-if="deliveryError" class="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-sm text-red-700 mb-4">
                     <div class="flex items-start gap-2">
                         <span class="material-symbols-outlined text-red-500 text-lg shrink-0" style="font-variation-settings:'FILL' 1">error</span>
@@ -334,18 +327,14 @@ const timeSlots = computed(() => {
 
             <!-- Pickup / Dine in: branch selection -->
             <template v-if="selectedType === 'pickup' || selectedType === 'dine_in'">
-                <div v-if="branches.length === 0" class="text-center py-8 text-sm text-gray-400">
-                    Sin sucursales disponibles.
-                </div>
+                <div v-if="branches.length === 0" class="text-center py-8 text-sm text-gray-400">Sin sucursales disponibles.</div>
                 <div v-else class="space-y-3 mb-4">
                     <button
                         v-for="branch in branches"
                         :key="branch.id"
                         @click="selectedBranch = branch"
                         class="w-full bg-white rounded-2xl border p-4 text-left transition-all"
-                        :class="selectedBranch?.id === branch.id
-                            ? 'border-[#FF5722] bg-orange-50'
-                            : 'border-gray-100'"
+                        :class="selectedBranch?.id === branch.id ? 'border-[#FF5722] bg-orange-50' : 'border-gray-100'"
                     >
                         <div class="flex items-start gap-3">
                             <div
@@ -363,7 +352,7 @@ const timeSlots = computed(() => {
                 </div>
             </template>
 
-            <!-- Scheduled time -->
+            <!-- Schedule -->
             <div class="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
                 <p class="text-sm font-semibold text-gray-900 mb-3">Para cuando?</p>
                 <div class="flex gap-2 mb-1">
@@ -371,19 +360,14 @@ const timeSlots = computed(() => {
                         @click="scheduledAt = null; showSchedule = false"
                         class="flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all"
                         :class="!scheduledAt ? 'bg-[#FF5722]/10 border-[#FF5722] text-[#FF5722]' : 'border-gray-100 text-gray-600'"
-                    >
-                        Lo antes posible
-                    </button>
+                    >Lo antes posible</button>
                     <button
                         @click="showSchedule = true; if (!scheduledAt && timeSlots.length) scheduledAt = timeSlots[0].value"
                         class="flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all"
                         :class="showSchedule ? 'bg-[#FF5722]/10 border-[#FF5722] text-[#FF5722]' : 'border-gray-100 text-gray-600'"
-                    >
-                        Programar
-                    </button>
+                    >Programar</button>
                 </div>
 
-                <!-- Time slot chips -->
                 <div v-if="showSchedule" class="mt-3">
                     <p class="text-xs text-gray-400 mb-2">Hoy</p>
                     <div v-if="timeSlots.length" class="flex flex-wrap gap-2">
@@ -395,20 +379,58 @@ const timeSlots = computed(() => {
                             :class="scheduledAt === slot.value
                                 ? 'bg-[#FF5722] text-white border-[#FF5722] shadow-md shadow-orange-200'
                                 : 'bg-gray-50 text-gray-700 border-gray-200'"
-                        >
-                            {{ slot.label }}
-                        </button>
+                        >{{ slot.label }}</button>
                     </div>
                     <p v-else class="text-xs text-gray-400 text-center py-3">Sin horarios disponibles para hoy.</p>
                 </div>
             </div>
+
+            </div>
+
+            <!-- Right column: order summary (desktop) -->
+            <div class="hidden md:block md:w-80 md:shrink-0">
+                <div class="sticky top-[85px] bg-white border border-gray-100 rounded-2xl p-5">
+                    <h3 class="font-bold text-gray-900 mb-4">Resumen del pedido</h3>
+
+                    <div class="space-y-2 mb-4 max-h-60 overflow-y-auto">
+                        <div v-for="(item, i) in cart.items" :key="i" class="flex items-start gap-3">
+                            <img v-if="item.product_image" :src="item.product_image" class="w-10 h-10 rounded-lg object-cover shrink-0" />
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900 leading-snug">{{ item.quantity }}x {{ item.product_name }}</p>
+                                <p v-if="item.modifiers.length" class="text-xs text-gray-400 truncate">{{ item.modifiers.map(m => m.name).join(', ') }}</p>
+                            </div>
+                            <span class="text-sm font-semibold text-gray-700 shrink-0">{{ formatPrice(item.item_total) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-3 space-y-1 mb-4">
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>Subtotal</span>
+                            <span>{{ formatPrice(cart.subtotal) }}</span>
+                        </div>
+                    </div>
+
+                    <button
+                        @click="proceed"
+                        :disabled="!canProceed"
+                        class="w-full py-3 rounded-xl text-sm font-semibold transition-colors"
+                        :class="canProceed
+                            ? 'bg-[#FF5722] text-white hover:bg-[#D84315]'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+                    >
+                        {{ proceeding ? 'Verificando cobertura...' : 'Continuar al pago' }}
+                    </button>
+                </div>
+            </div>
+
+            </div>
         </div>
 
-        <!-- Continue button -->
-        <div class="fixed bottom-5 left-4 right-4 max-w-md mx-auto">
+        <!-- Mobile CTA -->
+        <div class="fixed bottom-10 left-4 right-4 max-w-md mx-auto md:hidden">
             <button
                 @click="proceed"
-                :disabled="proceeding || (selectedType === 'delivery' && (!addressStreet || !addressNumber || !addressColony || !latitude || !longitude)) || ((selectedType === 'pickup' || selectedType === 'dine_in') && !selectedBranch)"
+                :disabled="!canProceed"
                 class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
             >
                 {{ proceeding ? 'Verificando cobertura...' : 'Continuar al pago' }}

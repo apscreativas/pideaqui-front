@@ -18,7 +18,7 @@ function proceed() {
 
         <!-- Header -->
         <header class="sticky top-0 z-10 bg-[#f6f8f7] border-b border-gray-100 px-4 py-3">
-            <div class="max-w-md mx-auto flex items-center gap-3">
+            <div class="max-w-md md:max-w-4xl mx-auto flex items-center gap-3">
                 <button
                     @click="router.back()"
                     class="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-100"
@@ -29,7 +29,7 @@ function proceed() {
             </div>
         </header>
 
-        <div class="max-w-md mx-auto px-4 py-4 pb-36">
+        <div class="max-w-md md:max-w-4xl mx-auto px-4 py-4 pb-40 md:pb-8">
 
             <!-- Empty cart -->
             <div v-if="cart.items.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
@@ -45,6 +45,8 @@ function proceed() {
             </div>
 
             <template v-else>
+                <div class="md:flex md:gap-6">
+                <div class="md:flex-1">
                 <!-- Cart items -->
                 <div class="space-y-3 mb-6">
                     <div
@@ -113,26 +115,38 @@ function proceed() {
                     Agregar más productos
                 </button>
 
-                <!-- Summary -->
-                <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+                </div>
+
+                <!-- Summary sidebar (desktop right) -->
+                <div class="md:w-80 md:shrink-0">
+                <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-6 md:sticky md:top-[85px]">
+                    <h3 class="hidden md:block font-bold text-gray-900 mb-4">Resumen del pedido</h3>
                     <div class="flex justify-between text-sm text-gray-600 mb-2">
                         <span>Subtotal</span>
                         <span class="font-semibold text-gray-900">${{ cart.subtotal.toFixed(2) }}</span>
                     </div>
                     <div class="flex justify-between text-xs text-gray-400 mb-3">
-                        <span>Envío</span>
+                        <span>Envio</span>
                         <span>Se calcula en el siguiente paso</span>
                     </div>
                     <div class="border-t border-gray-100 pt-3 flex justify-between font-bold text-base">
                         <span>Total</span>
                         <span class="text-[#FF5722]">${{ cart.subtotal.toFixed(2) }}</span>
                     </div>
+                    <button
+                        @click="proceed"
+                        class="hidden md:block w-full mt-4 bg-[#FF5722] text-white rounded-xl py-3 font-semibold text-sm hover:bg-[#D84315] transition-colors"
+                    >
+                        Continuar
+                    </button>
+                </div>
+                </div>
                 </div>
             </template>
         </div>
 
         <!-- Continue button -->
-        <div v-if="cart.items.length > 0" class="fixed bottom-5 left-4 right-4 max-w-md mx-auto">
+        <div v-if="cart.items.length > 0" class="fixed bottom-10 left-4 right-4 max-w-md mx-auto md:hidden">
             <button
                 @click="proceed"
                 class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform"

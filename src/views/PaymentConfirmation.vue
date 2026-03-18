@@ -37,69 +37,11 @@ onMounted(() => {
     }
 })
 
-function mapsUrl(lat, lng) {
-    return `https://maps.google.com/?q=${lat},${lng}`
-}
-
-function buildWhatsappMessage(orderId) {
-    const typeLabels = { delivery: 'A domicilio', pickup: 'Recoger en local', dine_in: 'Comer en el local' }
-
-    const itemLines = cart.items.map((item) => {
-        const mods = item.modifiers.length > 0 ? ` (${item.modifiers.map((m) => m.name).join(', ')})` : ''
-        const notes = item.notes ? ` - Nota: ${item.notes}` : ''
-        return `• ${item.quantity}x ${item.product_name}${mods}${notes} - $${item.item_total.toFixed(2)}`
-    }).join('\n')
-
-    let deliveryLines = ''
-    if (order.deliveryType === 'delivery') {
-        const fullAddress = `${order.addressStreet} #${order.addressNumber}, Col. ${order.addressColony}`
-        deliveryLines = `🚗 *Tipo:* A domicilio\n`
-            + `📍 *Dirección:* ${fullAddress}${order.addressReferences ? ' — ' + order.addressReferences : ''}\n`
-            + `🏪 *Sucursal:* ${order.branchName}\n`
-            + (order.distanceKm ? `📏 Distancia: ${order.distanceKm.toFixed(1)} km\n` : '')
-            + (order.latitude && order.longitude ? `📌 Ubicación: ${mapsUrl(order.latitude, order.longitude)}\n` : '')
-    } else {
-        deliveryLines = `🏪 *Tipo:* ${typeLabels[order.deliveryType]}\n`
-            + `📍 *Sucursal:* ${order.branchName}\n`
-            + (order.branchAddress ? `🗺️ ${order.branchAddress}\n` : '')
-            + (order.branchLatitude && order.branchLongitude ? `📌 Ubicación: ${mapsUrl(order.branchLatitude, order.branchLongitude)}\n` : '')
-    }
-
-    const scheduledLine = order.scheduledAt
-        ? `🕐 Programado para: ${new Date(order.scheduledAt).toLocaleString('es-MX')}`
-        : '🕐 Lo antes posible'
-
-    const paymentLine = { cash: 'Efectivo', terminal: 'Terminal bancaria', transfer: 'Transferencia (SPEI)' }[selectedPaymentMethod.value] ?? selectedPaymentMethod.value
-
-    let paymentExtra = ''
-    if (selectedPaymentMethod.value === 'cash' && cashAmount.value) {
-        const amt = parseFloat(cashAmount.value)
-        paymentExtra = `\n💵 *Paga con:* $${amt.toFixed(2)}`
-        const change = amt - total.value
-        if (change > 0) { paymentExtra += `\n🔄 *Cambio:* $${change.toFixed(2)}` }
-    }
-    if (selectedPaymentMethod.value === 'transfer' && selectedPmDetails.value) {
-        const pm = selectedPmDetails.value
-        paymentExtra = `\n🏦 *Banco:* ${pm.bank_name}`
-            + `\n👤 *Titular:* ${pm.account_holder}`
-            + `\n📋 *CLABE:* ${pm.clabe}`
-    }
-
-    return encodeURIComponent(
-        `*Pedido #${orderId} — GuisoGo*\n\n` +
-        `👤 *Cliente:* ${customerName.value} | ${customerPhone.value}\n\n` +
-        `🛒 *Pedido:*\n${itemLines}\n\n` +
-        `${deliveryLines}` +
-        `${scheduledLine}\n` +
-        `💳 *Pago:* ${paymentLine}${paymentExtra}\n\n` +
-        `*Subtotal:* $${cart.subtotal.toFixed(2)}\n` +
-        `*Envío:* $${order.deliveryCost.toFixed(2)}\n` +
-        `*Total: $${total.value.toFixed(2)}*`,
-    )
-}
 
 async function confirm() {
+    if (submitting.value) { return }
     if (!customerName.value || !customerPhone.value || !selectedPaymentMethod.value) { return }
+    if (selectedPaymentMethod.value === 'cash' && cashAmount.value && parseFloat(cashAmount.value) < total.value) { return }
 
     submitting.value = true
     submitError.value = null
@@ -134,7 +76,8 @@ async function confirm() {
             delivery_cost: order.deliveryCost,
             scheduled_at: order.scheduledAt || null,
             items: cart.items.map((item) => ({
-                product_id: item.product_id,
+                product_id: item.product_id || null,
+                promotion_id: item.promotion_id || null,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
                 notes: item.notes || null,
@@ -148,18 +91,21 @@ async function confirm() {
         const { data } = await api.post('/api/orders', payload)
         const orderId = data.data.order_id
         const whatsapp = data.data.branch_whatsapp
+        const whatsappMessage = data.data.whatsapp_message
 
         // Save customer data to cookie
+        // For non-delivery orders, preserve previously saved address data
+        const isDelivery = order.deliveryType === 'delivery'
         setCustomerCookie({
             token: cookie.token,
             name: customerName.value,
             phone: customerPhone.value,
-            address_street: order.addressStreet,
-            address_number: order.addressNumber,
-            address_colony: order.addressColony,
-            address_references: order.addressReferences,
-            latitude: order.latitude,
-            longitude: order.longitude,
+            address_street: isDelivery ? order.addressStreet : (cookie.address_street ?? ''),
+            address_number: isDelivery ? order.addressNumber : (cookie.address_number ?? ''),
+            address_colony: isDelivery ? order.addressColony : (cookie.address_colony ?? ''),
+            address_references: isDelivery ? order.addressReferences : (cookie.address_references ?? ''),
+            latitude: isDelivery ? order.latitude : (cookie.latitude ?? null),
+            longitude: isDelivery ? order.longitude : (cookie.longitude ?? null),
         })
 
         order.confirmedOrderId = orderId
@@ -171,13 +117,14 @@ async function confirm() {
             ? { bank_name: selectedPmDetails.value.bank_name, account_holder: selectedPmDetails.value.account_holder, clabe: selectedPmDetails.value.clabe }
             : null
 
-        // Open WhatsApp — use pre-opened window to avoid popup blocker
-        const message = buildWhatsappMessage(orderId)
+        // Open WhatsApp — use backend-generated message (single source of truth)
+        const sanitizedWhatsapp = whatsapp.replace(/[^\d+]/g, '')
+        const waUrl = `https://wa.me/${sanitizedWhatsapp}?text=${encodeURIComponent(whatsappMessage)}`
         if (whatsappWin) {
-            whatsappWin.location.href = `https://wa.me/${whatsapp}?text=${message}`
+            whatsappWin.location.href = waUrl
         } else {
             // Popups blocked — redirect current tab as fallback
-            window.location.href = `https://wa.me/${whatsapp}?text=${message}`
+            window.location.href = waUrl
         }
 
         order.setOrderSummary(cart.items, cart.subtotal, order.deliveryCost)
@@ -202,7 +149,7 @@ const selectedPmDetails = computed(() =>
 
         <!-- Header -->
         <header class="sticky top-0 z-10 bg-[#f6f8f7] border-b border-gray-100 px-4 py-3">
-            <div class="max-w-md mx-auto flex items-center gap-3">
+            <div class="max-w-6xl mx-auto flex items-center gap-3">
                 <button
                     @click="router.back()"
                     class="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-100"
@@ -213,8 +160,10 @@ const selectedPmDetails = computed(() =>
             </div>
         </header>
 
-        <div class="max-w-md mx-auto px-4 py-5 pb-36">
+        <div class="max-w-6xl mx-auto px-4 py-5 pb-40 md:pb-8">
+        <div class="md:flex md:gap-8">
 
+        <div class="md:flex-1 min-w-0">
             <!-- Customer data -->
             <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
                 <h2 class="text-sm font-bold text-gray-900 mb-4">Tus datos</h2>
@@ -226,6 +175,7 @@ const selectedPmDetails = computed(() =>
                             <input
                                 v-model="customerName"
                                 type="text"
+                                maxlength="255"
                                 placeholder="Juan Pérez"
                                 class="flex-1 bg-transparent text-sm focus:outline-none"
                             />
@@ -331,9 +281,10 @@ const selectedPmDetails = computed(() =>
                             class="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30"
                         />
                     </div>
-                    <p v-if="cashAmount && cashAmount < total" class="text-xs text-red-500 mt-1">El monto debe ser igual o mayor al total (${{ total.toFixed(2) }})</p>
-                    <p v-else-if="cashAmount && cashAmount >= total" class="text-xs text-gray-400 mt-1">Cambio: ${{ (cashAmount - total).toFixed(2) }}</p>
-                    <p class="text-xs text-gray-400 mt-1" v-if="!cashAmount">Opcional — para que el repartidor lleve cambio exacto.</p>
+                    <p v-if="cashAmount && parseFloat(cashAmount) <= 0" class="text-xs text-red-500 mt-1">El monto debe ser mayor a cero.</p>
+                    <p v-else-if="cashAmount && parseFloat(cashAmount) < total" class="text-xs text-red-500 mt-1">El monto debe ser igual o mayor al total (${{ total.toFixed(2) }})</p>
+                    <p v-else-if="cashAmount && parseFloat(cashAmount) >= total" class="text-xs text-gray-400 mt-1">Cambio: ${{ (parseFloat(cashAmount) - total).toFixed(2) }}</p>
+                    <p v-if="!cashAmount" class="text-xs text-gray-400 mt-1">Opcional — para que el repartidor lleve cambio exacto.</p>
                 </div>
 
                 <!-- Transfer bank details -->
@@ -348,16 +299,12 @@ const selectedPmDetails = computed(() =>
                 </div>
             </div>
 
-            <!-- Order summary -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
+            <!-- Order summary (mobile only) -->
+            <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-4 md:hidden">
                 <h2 class="text-sm font-bold text-gray-900 mb-3">Resumen del pedido</h2>
 
                 <div class="space-y-2 mb-3">
-                    <div
-                        v-for="(item, index) in cart.items"
-                        :key="index"
-                        class="flex justify-between text-sm"
-                    >
+                    <div v-for="(item, index) in cart.items" :key="index" class="flex justify-between text-sm">
                         <div>
                             <span class="text-gray-700">{{ item.quantity }}x {{ item.product_name }}</span>
                             <div v-if="item.modifiers.length > 0" class="text-xs text-gray-400">{{ item.modifiers.map(m => m.name).join(', ') }}</div>
@@ -372,7 +319,7 @@ const selectedPmDetails = computed(() =>
                         <span>${{ cart.subtotal.toFixed(2) }}</span>
                     </div>
                     <div class="flex justify-between text-sm text-gray-600">
-                        <span>Envío</span>
+                        <span>Envio</span>
                         <span>${{ order.deliveryCost.toFixed(2) }}</span>
                     </div>
                     <div class="flex justify-between font-bold text-base pt-1">
@@ -390,16 +337,65 @@ const selectedPmDetails = computed(() =>
                 </div>
             </div>
 
-            <p class="text-xs text-gray-400 text-center px-4">
-                Al confirmar, se abrirá WhatsApp con los detalles de tu pedido.
+            <p class="text-xs text-gray-400 text-center px-4 md:hidden">
+                Al confirmar, se abrira WhatsApp con los detalles de tu pedido.
             </p>
         </div>
 
-        <!-- Confirm button -->
-        <div class="fixed bottom-5 left-4 right-4 max-w-md mx-auto">
+            <!-- Desktop: Order summary sidebar (right) -->
+            <div class="hidden md:block md:w-80 md:shrink-0">
+                <div class="sticky top-[85px] bg-white border border-gray-100 rounded-2xl p-5">
+                    <h3 class="font-bold text-gray-900 mb-4">Resumen del pedido</h3>
+
+                    <div class="space-y-2 mb-4 max-h-52 overflow-y-auto">
+                        <div v-for="(item, i) in cart.items" :key="i" class="flex items-start gap-3">
+                            <img v-if="item.product_image" :src="item.product_image" class="w-10 h-10 rounded-lg object-cover shrink-0" />
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900 leading-snug">{{ item.quantity }}x {{ item.product_name }}</p>
+                                <p v-if="item.modifiers.length" class="text-xs text-gray-400 truncate">{{ item.modifiers.map(m => m.name).join(', ') }}</p>
+                            </div>
+                            <span class="text-sm font-semibold text-gray-700 shrink-0">${{ item.item_total.toFixed(2) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-3 space-y-1 mb-4">
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>Subtotal</span>
+                            <span>${{ cart.subtotal.toFixed(2) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>Envio</span>
+                            <span>${{ order.deliveryCost.toFixed(2) }}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-base pt-1">
+                            <span>Total</span>
+                            <span class="text-[#FF5722]">${{ total.toFixed(2) }}</span>
+                        </div>
+                    </div>
+
+                    <button
+                        @click="confirm"
+                        :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && cashAmount && parseFloat(cashAmount) < total)"
+                        class="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
+                        :class="submitting ? 'bg-gray-300 text-gray-500' : 'bg-[#FF5722] text-white hover:bg-[#D84315]'"
+                    >
+                        <span class="material-symbols-outlined text-lg" style="font-variation-settings:'FILL' 1">send</span>
+                        {{ submitting ? 'Registrando...' : 'Confirmar y enviar' }}
+                    </button>
+
+                    <p class="text-xs text-gray-400 text-center mt-3">
+                        Al confirmar, se abrira WhatsApp con los detalles de tu pedido.
+                    </p>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Mobile CTA -->
+        <div class="fixed bottom-10 left-4 right-4 max-w-md mx-auto md:hidden">
             <button
                 @click="confirm"
-                :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting"
+                :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && cashAmount && parseFloat(cashAmount) < total)"
                 class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
             >
                 <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">send</span>

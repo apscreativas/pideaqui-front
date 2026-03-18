@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 
-const STORAGE_KEY = 'guisogo_cart'
+const STORAGE_KEY = 'pideaqui_cart'
 
 function loadFromStorage() {
     try {
@@ -26,13 +26,20 @@ export const useCartStore = defineStore('cart', () => {
     )
 
     function addItem(product, selectedModifiers, quantity, notes) {
+        const price = Number(product.price)
         const modifiersTotal = selectedModifiers.reduce((s, m) => s + m.price_adjustment, 0)
-        const unitTotal = product.price + modifiersTotal
+        const unitTotal = price + modifiersTotal
         const itemTotal = unitTotal * quantity
 
-        // Check if same product with same modifiers already in cart
+        // Determine if this is a promotion item (id like "promo_5") or a product.
+        const isPromotion = product.is_promotion === true
+        const productId = isPromotion ? null : product.id
+        const promotionId = isPromotion ? product.promotion_id : null
+
+        // Check if same item with same modifiers already in cart.
         const existingIndex = items.value.findIndex((i) =>
-            i.product_id === product.id &&
+            i.product_id === productId &&
+            i.promotion_id === promotionId &&
             JSON.stringify(i.modifiers.map((m) => m.modifier_option_id).sort()) ===
             JSON.stringify(selectedModifiers.map((m) => m.modifier_option_id).sort()) &&
             i.notes === notes,
@@ -44,10 +51,11 @@ export const useCartStore = defineStore('cart', () => {
             existing.item_total = (existing.unit_price + existing.modifiers.reduce((s, m) => s + m.price_adjustment, 0)) * existing.quantity
         } else {
             items.value.push({
-                product_id: product.id,
+                product_id: productId,
+                promotion_id: promotionId,
                 product_name: product.name,
                 product_image: product.image_url,
-                unit_price: product.price,
+                unit_price: price,
                 quantity,
                 notes,
                 modifiers: selectedModifiers,

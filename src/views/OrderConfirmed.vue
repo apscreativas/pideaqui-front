@@ -34,20 +34,20 @@ function resendWhatsapp() {
     if (order.deliveryType === 'delivery') {
         const fullAddress = `${order.addressStreet} #${order.addressNumber}, Col. ${order.addressColony}`
         deliveryLines = `🚗 *Tipo:* A domicilio\n`
-            + `📍 *Dirección:* ${fullAddress}${order.addressReferences ? ' — ' + order.addressReferences : ''}\n`
+            + `📍 *Direccion:* ${fullAddress}${order.addressReferences ? ' - ' + order.addressReferences : ''}\n`
             + `🏪 *Sucursal:* ${order.branchName}\n`
             + (order.distanceKm ? `📏 Distancia: ${order.distanceKm.toFixed(1)} km\n` : '')
-            + (order.latitude && order.longitude ? `📌 Ubicación: ${mapsUrl(order.latitude, order.longitude)}\n` : '')
+            + (order.latitude && order.longitude ? `📌 *Ubicacion:* ${mapsUrl(order.latitude, order.longitude)}\n` : '')
     } else {
         deliveryLines = `🏪 *Tipo:* ${typeLabels[order.deliveryType]}\n`
             + `📍 *Sucursal:* ${order.branchName}\n`
-            + (order.branchAddress ? `🏠 ${order.branchAddress}\n` : '')
-            + (order.branchLatitude && order.branchLongitude ? `📌 Ubicación: ${mapsUrl(order.branchLatitude, order.branchLongitude)}\n` : '')
+            + (order.branchAddress ? `${order.branchAddress}\n` : '')
+            + (order.branchLatitude && order.branchLongitude ? `📌 *Ubicacion:* ${mapsUrl(order.branchLatitude, order.branchLongitude)}\n` : '')
     }
 
     const scheduledLine = order.scheduledAt
-        ? `🕐 Programado para: ${new Date(order.scheduledAt).toLocaleString('es-MX')}`
-        : '🕐 Lo antes posible'
+        ? `⏰ Programado para: ${new Date(order.scheduledAt).toLocaleString('es-MX')}`
+        : '⏰ Lo antes posible'
 
     const paymentLine = paymentLabels[order.paymentMethod] ?? order.paymentMethod
 
@@ -66,19 +66,20 @@ function resendWhatsapp() {
     }
 
     const message = encodeURIComponent(
-        `*Pedido #${order.confirmedOrderId} — PideAqui*\n\n` +
+        `*Pedido #${order.confirmedOrderId} - PideAqui*\n\n` +
         `👤 *Cliente:* ${order.customerName} | ${order.customerPhone}\n\n` +
-        `🛒 *Pedido:*\n${itemLines}\n\n` +
+        `📝 *Pedido:*\n${itemLines}\n\n` +
         `${deliveryLines}` +
         `${scheduledLine}\n` +
         `💳 *Pago:* ${paymentLine}${paymentExtra}\n\n` +
-        `*Subtotal:* $${summary.subtotal.toFixed(2)}\n` +
-        `*Envío:* $${summary.deliveryCost.toFixed(2)}\n` +
-        `*Total: $${summary.total.toFixed(2)}*`,
+        `💰 *Subtotal:* $${summary.subtotal.toFixed(2)}\n` +
+        `🚚 *Envio:* $${summary.deliveryCost.toFixed(2)}\n` +
+        `✅ *Total: $${summary.total.toFixed(2)}*\n\n` +
+        `Gracias! 🙌`,
     )
 
     const sanitizedWhatsapp = order.branchWhatsapp.replace(/[^\d+]/g, '')
-    window.open(`https://wa.me/${sanitizedWhatsapp}?text=${message}`, '_blank')
+    window.open(`https://api.whatsapp.com/send?phone=${sanitizedWhatsapp}&text=${message}`, '_blank')
 }
 </script>
 

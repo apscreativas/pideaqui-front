@@ -119,7 +119,7 @@ async function confirm() {
 
         // Open WhatsApp — use backend-generated message (single source of truth)
         const sanitizedWhatsapp = whatsapp.replace(/[^\d+]/g, '')
-        const waUrl = `https://wa.me/${sanitizedWhatsapp}?text=${encodeURIComponent(whatsappMessage)}`
+        const waUrl = `https://api.whatsapp.com/send?phone=${sanitizedWhatsapp}&text=${encodeURIComponent(whatsappMessage)}`
         if (whatsappWin) {
             whatsappWin.location.href = waUrl
         } else {

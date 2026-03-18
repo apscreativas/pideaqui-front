@@ -84,9 +84,11 @@ const timeSlots = computed(() => {
         const h = d.getHours()
         const m = d.getMinutes()
         if (h > openH || (h === openH && m >= openM)) {
-            const iso = new Date(d).toISOString()
-            const label = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-            slots.push({ value: iso, label })
+            // Send local datetime (not UTC) so backend timezone matches
+            const pad = (n) => String(n).padStart(2, '0')
+            const localIso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(h)}:${pad(m)}:00`
+            const label = `${pad(h)}:${pad(m)}`
+            slots.push({ value: localIso, label })
         }
         d.setMinutes(d.getMinutes() + 30)
     }

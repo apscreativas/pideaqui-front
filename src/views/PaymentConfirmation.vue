@@ -41,7 +41,7 @@ onMounted(() => {
 async function confirm() {
     if (submitting.value) { return }
     if (!customerName.value || !customerPhone.value || !selectedPaymentMethod.value) { return }
-    if (selectedPaymentMethod.value === 'cash' && cashAmount.value && parseFloat(cashAmount.value) < total.value) { return }
+    if (selectedPaymentMethod.value === 'cash' && (!cashAmount.value || parseFloat(cashAmount.value) < total.value)) { return }
 
     submitting.value = true
     submitError.value = null
@@ -284,7 +284,7 @@ const selectedPmDetails = computed(() =>
                     <p v-if="cashAmount && parseFloat(cashAmount) <= 0" class="text-xs text-red-500 mt-1">El monto debe ser mayor a cero.</p>
                     <p v-else-if="cashAmount && parseFloat(cashAmount) < total" class="text-xs text-red-500 mt-1">El monto debe ser igual o mayor al total (${{ total.toFixed(2) }})</p>
                     <p v-else-if="cashAmount && parseFloat(cashAmount) >= total" class="text-xs text-gray-400 mt-1">Cambio: ${{ (parseFloat(cashAmount) - total).toFixed(2) }}</p>
-                    <p v-if="!cashAmount" class="text-xs text-gray-400 mt-1">Opcional — para que el repartidor lleve cambio exacto.</p>
+                    <p v-if="!cashAmount" class="text-xs text-red-500 mt-1">Indica con cuanto pagas para calcular tu cambio.</p>
                 </div>
 
                 <!-- Transfer bank details -->
@@ -375,7 +375,7 @@ const selectedPmDetails = computed(() =>
 
                     <button
                         @click="confirm"
-                        :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && cashAmount && parseFloat(cashAmount) < total)"
+                        :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) < total))"
                         class="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
                         :class="submitting ? 'bg-gray-300 text-gray-500' : 'bg-[#FF5722] text-white hover:bg-[#D84315]'"
                     >
@@ -395,7 +395,7 @@ const selectedPmDetails = computed(() =>
         <div class="fixed bottom-10 left-4 right-4 max-w-md mx-auto md:hidden">
             <button
                 @click="confirm"
-                :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && cashAmount && parseFloat(cashAmount) < total)"
+                :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) < total))"
                 class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
             >
                 <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">send</span>

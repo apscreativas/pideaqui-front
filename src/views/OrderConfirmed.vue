@@ -46,36 +46,35 @@ function resendWhatsapp() {
     }
 
     const scheduledLine = order.scheduledAt
-        ? `⏰ Programado para: ${new Date(order.scheduledAt).toLocaleString('es-MX')}`
-        : '⏰ Lo antes posible'
+        ? `🕐 Programado para: ${new Date(order.scheduledAt).toLocaleString('es-MX')}`
+        : '🕐 Lo antes posible'
 
     const paymentLine = paymentLabels[order.paymentMethod] ?? order.paymentMethod
 
     let paymentExtra = ''
     if (order.paymentMethod === 'cash' && order.cashAmount) {
         const amt = parseFloat(order.cashAmount)
-        paymentExtra = `\n💵 *Paga con:* $${amt.toFixed(2)}`
+        paymentExtra = `\n*Paga con:* $${amt.toFixed(2)}`
         const change = amt - summary.total
-        if (change > 0) { paymentExtra += `\n🔄 *Cambio:* $${change.toFixed(2)}` }
+        if (change > 0) { paymentExtra += `\n*Cambio:* $${change.toFixed(2)}` }
     }
     if (order.paymentMethod === 'transfer' && order.transferDetails) {
         const td = order.transferDetails
-        paymentExtra = `\n🏦 *Banco:* ${td.bank_name}`
-            + `\n👤 *Titular:* ${td.account_holder}`
-            + `\n📋 *CLABE:* ${td.clabe}`
+        paymentExtra = `\n*Banco:* ${td.bank_name}`
+            + `\n*Titular:* ${td.account_holder}`
+            + `\n*CLABE:* ${td.clabe}`
     }
 
     const message = encodeURIComponent(
         `*Pedido #${order.confirmedOrderId} - PideAqui*\n\n` +
         `👤 *Cliente:* ${order.customerName} | ${order.customerPhone}\n\n` +
-        `📝 *Pedido:*\n${itemLines}\n\n` +
+        `🛒 *Pedido:*\n${itemLines}\n\n` +
         `${deliveryLines}` +
         `${scheduledLine}\n` +
         `💳 *Pago:* ${paymentLine}${paymentExtra}\n\n` +
-        `💰 *Subtotal:* $${summary.subtotal.toFixed(2)}\n` +
-        `🚚 *Envio:* $${summary.deliveryCost.toFixed(2)}\n` +
-        `✅ *Total: $${summary.total.toFixed(2)}*\n\n` +
-        `Gracias! 🙌`,
+        `*Subtotal:* $${summary.subtotal.toFixed(2)}\n` +
+        `*Envio:* $${summary.deliveryCost.toFixed(2)}\n` +
+        `*Total: $${summary.total.toFixed(2)}*`,
     )
 
     const sanitizedWhatsapp = order.branchWhatsapp.replace(/[^\d+]/g, '')

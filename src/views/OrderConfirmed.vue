@@ -73,6 +73,7 @@ function resendWhatsapp() {
         `${scheduledLine}\n` +
         `💳 *Pago:* ${paymentLine}${paymentExtra}\n\n` +
         `*Subtotal:* $${summary.subtotal.toFixed(2)}\n` +
+        (summary.discount > 0 ? `🏷️ *Cupón:* ${summary.couponCode} (-$${summary.discount.toFixed(2)})\n` : '') +
         `*Envio:* $${summary.deliveryCost.toFixed(2)}\n` +
         `*Total: $${summary.total.toFixed(2)}*`,
     )
@@ -83,7 +84,7 @@ function resendWhatsapp() {
 </script>
 
 <template>
-    <div class="min-h-dvh bg-[#f6f8f7] flex flex-col">
+    <div class="min-h-dvh flex flex-col" style="background-color: var(--color-primary)">
 
         <!-- Header -->
         <header class="flex items-center p-4 pb-2 z-10">
@@ -91,9 +92,9 @@ function resendWhatsapp() {
                 @click="goBack"
                 class="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
             >
-                <span class="material-symbols-outlined text-gray-900 text-2xl">close</span>
+                <span class="material-symbols-outlined text-2xl" :style="{ color: 'var(--color-text)' }">close</span>
             </button>
-            <h1 class="text-lg font-bold text-gray-900 tracking-tight flex-1 text-center pr-10">
+            <h1 class="text-lg font-bold tracking-tight flex-1 text-center pr-10" :style="{ color: 'var(--color-text)' }">
                 {{ restaurantStore.restaurant?.name ?? '' }}
             </h1>
         </header>
@@ -103,14 +104,14 @@ function resendWhatsapp() {
 
             <!-- Success icon + text -->
             <div class="flex flex-col items-center gap-6 mt-8">
-                <div class="w-32 h-32 rounded-full bg-[#FF5722]/20 flex items-center justify-center animate-pulse">
-                    <div class="w-24 h-24 rounded-full bg-[#FF5722] flex items-center justify-center shadow-lg shadow-[#FF5722]/40">
+                <div class="w-32 h-32 rounded-full flex items-center justify-center animate-pulse" style="background-color: var(--color-secondary-light)">
+                    <div class="w-24 h-24 rounded-full flex items-center justify-center shadow-lg" :style="{ backgroundColor: 'var(--color-secondary)', boxShadow: '0 10px 15px -3px var(--color-secondary-ring)' }">
                         <span class="material-symbols-outlined text-white !text-[64px]">check</span>
                     </div>
                 </div>
                 <div class="flex flex-col items-center gap-2 text-center">
-                    <h2 class="text-3xl font-bold tracking-tight text-gray-900">Pedido enviado</h2>
-                    <p class="text-gray-500 text-base leading-relaxed max-w-[280px]">
+                    <h2 class="text-3xl font-bold tracking-tight" :style="{ color: 'var(--color-text)' }">Pedido enviado</h2>
+                    <p class="text-base leading-relaxed max-w-[280px]" :style="{ color: 'var(--color-text-secondary)' }">
                         Recibirás la confirmación y detalles de tu orden por WhatsApp.
                     </p>
                 </div>
@@ -119,15 +120,16 @@ function resendWhatsapp() {
             <!-- Order ID badge -->
             <div
                 v-if="order.confirmedOrderId"
-                class="inline-flex items-center justify-center h-10 px-6 rounded-full bg-[#FF5722]/10 border border-[#FF5722]/20"
+                class="inline-flex items-center justify-center h-10 px-6 rounded-full"
+                style="background-color: var(--color-secondary-light); border: 1px solid color-mix(in srgb, var(--color-secondary) 20%, transparent)"
             >
-                <span class="text-[#FF5722] font-bold text-lg tracking-wide">#{{ order.confirmedOrderId }}</span>
+                <span class="font-bold text-lg tracking-wide" :style="{ color: 'var(--color-secondary)' }">#{{ order.confirmedOrderId }}</span>
             </div>
 
             <!-- Order summary card -->
-            <div v-if="summary" class="w-full bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div v-if="summary" class="w-full rounded-xl shadow-sm overflow-hidden" :style="{ backgroundColor: 'var(--color-card-bg)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--color-border-light)' }">
                 <!-- Gradient header -->
-                <div class="relative h-32 w-full bg-gradient-to-r from-[#FF5722] to-[#D84315]">
+                <div class="relative h-32 w-full" style="background: linear-gradient(to right, var(--color-secondary), var(--color-secondary-dark))">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                     <div class="absolute bottom-3 left-4 right-4">
                         <p class="text-white font-bold text-lg">Resumen del pedido</p>
@@ -135,48 +137,52 @@ function resendWhatsapp() {
                 </div>
 
                 <!-- Items -->
-                <div class="p-4 flex flex-col gap-3 border-b border-gray-100">
+                <div class="p-4 flex flex-col gap-3" :style="{ borderBottomWidth: '1px', borderBottomStyle: 'solid', borderBottomColor: 'var(--color-border-light)' }">
                     <div
                         v-for="(item, index) in summary.items"
                         :key="index"
                         class="flex justify-between items-start"
                     >
                         <div class="flex gap-3">
-                            <span class="bg-gray-100 text-gray-600 font-bold text-xs h-6 w-6 rounded flex items-center justify-center mt-0.5">
+                            <span class="bg-gray-100 font-bold text-xs h-6 w-6 rounded flex items-center justify-center mt-0.5" :style="{ color: 'var(--color-text-secondary)' }">
                                 {{ item.quantity }}
                             </span>
                             <div class="flex flex-col">
-                                <p class="text-sm font-medium text-gray-900">{{ item.product_name }}</p>
+                                <p class="text-sm font-medium" :style="{ color: 'var(--color-text)' }">{{ item.product_name }}</p>
                                 <p
                                     v-if="item.modifiers && item.modifiers.length > 0"
-                                    class="text-xs text-gray-500"
+                                    class="text-xs" :style="{ color: 'var(--color-text-secondary)' }"
                                 >{{ item.modifiers.map(m => m.name).join(', ') }}</p>
                             </div>
                         </div>
-                        <p class="text-sm font-medium text-gray-900">${{ item.item_total.toFixed(2) }}</p>
+                        <p class="text-sm font-medium" :style="{ color: 'var(--color-text)' }">${{ item.item_total.toFixed(2) }}</p>
                     </div>
                 </div>
 
                 <!-- Totals -->
                 <div class="p-4 bg-gray-50">
                     <div class="flex justify-between items-center mb-1">
-                        <p class="text-gray-500 text-sm">Subtotal</p>
-                        <p class="text-gray-900 text-sm font-medium">${{ summary.subtotal.toFixed(2) }}</p>
+                        <p class="text-sm" :style="{ color: 'var(--color-text-secondary)' }">Subtotal</p>
+                        <p class="text-sm font-medium" :style="{ color: 'var(--color-text)' }">${{ summary.subtotal.toFixed(2) }}</p>
+                    </div>
+                    <div v-if="summary.discount > 0" class="flex justify-between items-center mb-1">
+                        <p class="text-sm text-green-600">Descuento ({{ summary.couponCode }})</p>
+                        <p class="text-sm font-medium text-green-600">-${{ summary.discount.toFixed(2) }}</p>
                     </div>
                     <div class="flex justify-between items-center mb-3">
-                        <p class="text-gray-500 text-sm">Envío</p>
-                        <p class="text-gray-900 text-sm font-medium">${{ summary.deliveryCost.toFixed(2) }}</p>
+                        <p class="text-sm" :style="{ color: 'var(--color-text-secondary)' }">Envío</p>
+                        <p class="text-sm font-medium" :style="{ color: 'var(--color-text)' }">${{ summary.deliveryCost.toFixed(2) }}</p>
                     </div>
-                    <div class="flex justify-between items-center border-t border-gray-200 pt-3">
-                        <p class="text-[#FF5722] font-bold text-base">Total</p>
-                        <p class="text-gray-900 font-bold text-xl">${{ summary.total.toFixed(2) }} MXN</p>
+                    <div class="flex justify-between items-center pt-3" :style="{ borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'var(--color-border)' }">
+                        <p class="font-bold text-base" :style="{ color: 'var(--color-secondary)' }">Total</p>
+                        <p class="font-bold text-xl" :style="{ color: 'var(--color-text)' }">${{ summary.total.toFixed(2) }} MXN</p>
                     </div>
                 </div>
             </div>
         </main>
 
         <!-- Footer -->
-        <footer class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-6 flex flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-t-xl z-20">
+        <footer class="fixed bottom-0 left-0 right-0 p-6 flex flex-col gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] rounded-t-xl z-20" :style="{ backgroundColor: 'var(--color-card-bg)', borderTopWidth: '1px', borderTopStyle: 'solid', borderTopColor: 'var(--color-border-light)' }">
             <div class="max-w-md md:max-w-lg mx-auto w-full flex flex-col gap-3">
                 <button
                     v-if="order.branchWhatsapp && order.confirmedOrderId"
@@ -188,7 +194,8 @@ function resendWhatsapp() {
                 </button>
                 <button
                     @click="goBack"
-                    class="w-full h-12 rounded-full bg-[#FF5722] hover:bg-[#e64a19] text-white font-bold text-base tracking-wide shadow-lg shadow-[#FF5722]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    class="w-full h-12 rounded-full text-white font-bold text-base tracking-wide shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:brightness-90"
+                    :style="{ backgroundColor: 'var(--color-secondary)', boxShadow: '0 10px 15px -3px var(--color-secondary-ring)' }"
                 >
                     Volver al menú
                 </button>

@@ -34,6 +34,8 @@ export const useOrderStore = defineStore('order', () => {
     const transferDetails = ref(saved.transferDetails ?? null)
     const customerName = ref(saved.customerName ?? '')
     const customerPhone = ref(saved.customerPhone ?? '')
+    const couponCode = ref(saved.couponCode ?? null)
+    const couponDiscount = ref(saved.couponDiscount ?? 0)
     const confirmedOrderId = ref(saved.confirmedOrderId ?? null)
     const orderSummary = ref(saved.orderSummary ?? null)
 
@@ -42,7 +44,7 @@ export const useOrderStore = defineStore('order', () => {
         branchLatitude, branchLongitude, distanceKm, deliveryCost,
         addressStreet, addressNumber, addressColony, addressReferences, latitude, longitude,
         scheduledAt, paymentMethod, customerName, customerPhone,
-        cashAmount, transferDetails, confirmedOrderId, orderSummary,
+        cashAmount, transferDetails, couponCode, couponDiscount, confirmedOrderId, orderSummary,
     ], () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             deliveryType: deliveryType.value,
@@ -64,6 +66,8 @@ export const useOrderStore = defineStore('order', () => {
             paymentMethod: paymentMethod.value,
             cashAmount: cashAmount.value,
             transferDetails: transferDetails.value,
+            couponCode: couponCode.value,
+            couponDiscount: couponDiscount.value,
             customerName: customerName.value,
             customerPhone: customerPhone.value,
             confirmedOrderId: confirmedOrderId.value,
@@ -89,12 +93,14 @@ export const useOrderStore = defineStore('order', () => {
         longitude.value = deliveryData.longitude ?? null
     }
 
-    function setOrderSummary(cartItems, subtotal, deliveryCostVal) {
+    function setOrderSummary(cartItems, subtotal, deliveryCostVal, discountVal = 0) {
         orderSummary.value = {
             items: JSON.parse(JSON.stringify(cartItems)),
             subtotal,
             deliveryCost: deliveryCostVal,
-            total: subtotal + deliveryCostVal,
+            discount: discountVal,
+            couponCode: couponCode.value,
+            total: subtotal - discountVal + deliveryCostVal,
         }
     }
 
@@ -118,6 +124,8 @@ export const useOrderStore = defineStore('order', () => {
         paymentMethod.value = null
         cashAmount.value = null
         transferDetails.value = null
+        couponCode.value = null
+        couponDiscount.value = 0
         confirmedOrderId.value = null
         orderSummary.value = null
         localStorage.removeItem(STORAGE_KEY)
@@ -127,7 +135,9 @@ export const useOrderStore = defineStore('order', () => {
         deliveryType, branchId, branchName, branchWhatsapp,
         branchAddress, branchLatitude, branchLongitude, distanceKm,
         deliveryCost, addressStreet, addressNumber, addressColony, addressReferences, latitude, longitude,
-        scheduledAt, paymentMethod, cashAmount, transferDetails, customerName, customerPhone, confirmedOrderId,
+        scheduledAt, paymentMethod, cashAmount, transferDetails,
+        couponCode, couponDiscount,
+        customerName, customerPhone, confirmedOrderId,
         orderSummary,
         setDelivery, setOrderSummary, reset,
     }

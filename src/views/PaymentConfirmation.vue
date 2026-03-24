@@ -13,15 +13,64 @@ const order = useOrderStore()
 const restaurantStore = useRestaurantStore()
 
 const paymentMethods = computed(() => restaurantStore.paymentMethods)
-const total = computed(() => cart.subtotal + order.deliveryCost)
+const total = computed(() => cart.subtotal - couponDiscount.value + order.deliveryCost)
 
 const customerName = ref(order.customerName)
 const customerPhone = ref(order.customerPhone)
 const selectedPaymentMethod = ref(null)
 
 const cashAmount = ref(null)
+const requiresInvoice = ref(false)
 const submitting = ref(false)
 const submitError = ref(null)
+
+// Coupon state
+const couponInput = ref('')
+const couponDiscount = ref(0)
+const couponApplied = ref(false)
+const couponError = ref(null)
+const couponLoading = ref(false)
+const couponLabel = ref('')
+
+async function applyCoupon() {
+    if (!couponInput.value.trim() || couponLoading.value) return
+    if (!customerPhone.value || !/^\d{10}$/.test(customerPhone.value)) {
+        couponError.value = 'Ingresa tu teléfono primero para validar el cupón.'
+        return
+    }
+    couponLoading.value = true
+    couponError.value = null
+    try {
+        const { data } = await api.post('/api/coupons/validate', {
+            code: couponInput.value.trim(),
+            subtotal: cart.subtotal,
+            customer_phone: customerPhone.value,
+        })
+        if (data.valid) {
+            couponApplied.value = true
+            couponDiscount.value = data.calculated_discount
+            couponLabel.value = couponInput.value.trim().toUpperCase()
+            order.couponCode = couponLabel.value
+            order.couponDiscount = data.calculated_discount
+        } else {
+            couponError.value = data.reason
+        }
+    } catch {
+        couponError.value = 'Error al validar el cupón. Intenta de nuevo.'
+    } finally {
+        couponLoading.value = false
+    }
+}
+
+function removeCoupon() {
+    couponApplied.value = false
+    couponDiscount.value = 0
+    couponLabel.value = ''
+    couponError.value = null
+    couponInput.value = ''
+    order.couponCode = null
+    order.couponDiscount = 0
+}
 
 onMounted(() => {
     // Pre-fill from cookie
@@ -75,16 +124,23 @@ async function confirm() {
             distance_km: order.distanceKm || null,
             delivery_cost: order.deliveryCost,
             scheduled_at: order.scheduledAt || null,
+            requires_invoice: requiresInvoice.value,
+            coupon_code: couponApplied.value ? couponLabel.value : null,
             items: cart.items.map((item) => ({
                 product_id: item.product_id || null,
                 promotion_id: item.promotion_id || null,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
                 notes: item.notes || null,
-                modifiers: item.modifiers.map((m) => ({
-                    modifier_option_id: m.modifier_option_id,
-                    price_adjustment: m.price_adjustment,
-                })),
+                modifiers: item.modifiers.map((m) => {
+                    const mod = { price_adjustment: m.price_adjustment }
+                    if (m.modifier_option_template_id) {
+                        mod.modifier_option_template_id = m.modifier_option_template_id
+                    } else {
+                        mod.modifier_option_id = m.modifier_option_id
+                    }
+                    return mod
+                }),
             })),
         }
 
@@ -127,7 +183,7 @@ async function confirm() {
             window.location.href = waUrl
         }
 
-        order.setOrderSummary(cart.items, cart.subtotal, order.deliveryCost)
+        order.setOrderSummary(cart.items, cart.subtotal, order.deliveryCost, couponDiscount.value)
         cart.clear()
         router.push('/confirmed')
     } catch (err) {
@@ -145,18 +201,19 @@ const selectedPmDetails = computed(() =>
 </script>
 
 <template>
-    <div class="min-h-dvh bg-[#f6f8f7]">
+    <div class="min-h-dvh" style="background-color: var(--color-primary)">
 
         <!-- Header -->
-        <header class="sticky top-0 z-10 bg-[#f6f8f7] border-b border-gray-100 px-4 py-3">
+        <header class="sticky top-0 z-10 border-b px-4 py-3" :style="{ backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-border-light)' }">
             <div class="max-w-6xl mx-auto flex items-center gap-3">
                 <button
                     @click="router.back()"
-                    class="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-100"
+                    class="w-9 h-9 flex items-center justify-center rounded-full border"
+                    :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }"
                 >
-                    <span class="material-symbols-outlined text-gray-600 text-xl">arrow_back</span>
+                    <span class="material-symbols-outlined text-xl" :style="{ color: 'var(--color-text-secondary)' }">arrow_back</span>
                 </button>
-                <h1 class="text-base font-bold text-gray-900">Confirmar pedido</h1>
+                <h1 class="text-base font-bold" :style="{ color: 'var(--color-text)' }">Confirmar pedido</h1>
             </div>
         </header>
 
@@ -165,26 +222,27 @@ const selectedPmDetails = computed(() =>
 
         <div class="md:flex-1 min-w-0">
             <!-- Customer data -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
-                <h2 class="text-sm font-bold text-gray-900 mb-4">Tus datos</h2>
+            <div class="rounded-2xl border p-5 mb-4" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                <h2 class="text-sm font-bold mb-4" :style="{ color: 'var(--color-text)' }">Tus datos</h2>
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Nombre completo</label>
-                        <div class="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3">
-                            <span class="material-symbols-outlined text-gray-400 text-lg">person</span>
+                        <label class="block text-xs font-semibold uppercase tracking-wide mb-1" :style="{ color: 'var(--color-text-secondary)' }">Nombre completo</label>
+                        <div class="flex items-center gap-2 rounded-xl px-4 py-3" :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border)' }">
+                            <span class="material-symbols-outlined text-lg" :style="{ color: 'var(--color-text-muted)' }">person</span>
                             <input
                                 v-model="customerName"
                                 type="text"
                                 maxlength="255"
                                 placeholder="Juan Pérez"
                                 class="flex-1 bg-transparent text-sm focus:outline-none"
+                                :style="{ color: 'var(--color-text)' }"
                             />
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Teléfono</label>
-                        <div class="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3">
-                            <span class="material-symbols-outlined text-gray-400 text-lg" aria-hidden="true">phone</span>
+                        <label class="block text-xs font-semibold uppercase tracking-wide mb-1" :style="{ color: 'var(--color-text-secondary)' }">Teléfono</label>
+                        <div class="flex items-center gap-2 rounded-xl px-4 py-3" :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border)' }">
+                            <span class="material-symbols-outlined text-lg" :style="{ color: 'var(--color-text-muted)' }" aria-hidden="true">phone</span>
                             <input
                                 v-model="customerPhone"
                                 type="tel"
@@ -195,6 +253,7 @@ const selectedPmDetails = computed(() =>
                                 autocomplete="tel-national"
                                 placeholder="5512345678"
                                 class="flex-1 bg-transparent text-sm focus-visible:outline-none"
+                                :style="{ color: 'var(--color-text)' }"
                             />
                         </div>
                         <p v-if="customerPhone && !/^\d{10}$/.test(customerPhone)" class="mt-1 text-xs text-red-500">Ingresa 10 dígitos numéricos.</p>
@@ -203,39 +262,39 @@ const selectedPmDetails = computed(() =>
             </div>
 
             <!-- Delivery summary -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
-                <h2 class="text-sm font-bold text-gray-900 mb-3">Entrega</h2>
+            <div class="rounded-2xl border p-5 mb-4" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                <h2 class="text-sm font-bold mb-3" :style="{ color: 'var(--color-text)' }">Entrega</h2>
                 <div class="flex items-start gap-3">
-                    <span class="material-symbols-outlined text-[#FF5722] text-xl" style="font-variation-settings:'FILL' 1">
+                    <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1; color: var(--color-secondary)">
                         {{ order.deliveryType === 'delivery' ? 'delivery_dining' : order.deliveryType === 'pickup' ? 'shopping_bag' : 'restaurant' }}
                     </span>
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs font-medium text-[#FF5722] mb-0.5">
+                        <p class="text-xs font-medium mb-0.5" :style="{ color: 'var(--color-secondary)' }">
                             {{ order.deliveryType === 'delivery' ? 'A domicilio' : order.deliveryType === 'pickup' ? 'Recoger en local' : 'Comer en el local' }}
                         </p>
-                        <p class="text-sm font-semibold text-gray-900">{{ order.branchName }}</p>
+                        <p class="text-sm font-semibold" :style="{ color: 'var(--color-text)' }">{{ order.branchName }}</p>
 
                         <!-- Delivery: customer address -->
                         <template v-if="order.deliveryType === 'delivery'">
-                            <p v-if="order.addressStreet" class="text-xs text-gray-500 mt-0.5">{{ order.addressStreet }} #{{ order.addressNumber }}, Col. {{ order.addressColony }}</p>
-                            <p v-if="order.distanceKm" class="text-xs text-gray-500 mt-0.5">{{ order.distanceKm?.toFixed(1) }} km · ${{ order.deliveryCost.toFixed(2) }} envio</p>
+                            <p v-if="order.addressStreet" class="text-xs mt-0.5" :style="{ color: 'var(--color-text-secondary)' }">{{ order.addressStreet }} #{{ order.addressNumber }}, Col. {{ order.addressColony }}</p>
+                            <p v-if="order.distanceKm" class="text-xs mt-0.5" :style="{ color: 'var(--color-text-secondary)' }">{{ order.distanceKm?.toFixed(1) }} km · ${{ order.deliveryCost.toFixed(2) }} envio</p>
                         </template>
 
                         <!-- Pickup / Dine in: branch address -->
                         <template v-else>
-                            <p v-if="order.branchAddress" class="text-xs text-gray-500 mt-0.5">{{ order.branchAddress }}</p>
+                            <p v-if="order.branchAddress" class="text-xs mt-0.5" :style="{ color: 'var(--color-text-secondary)' }">{{ order.branchAddress }}</p>
                         </template>
 
-                        <p class="text-xs text-gray-400 mt-1">{{ order.scheduledAt ? 'Programado: ' + new Date(order.scheduledAt).toLocaleString('es-MX') : 'Lo antes posible' }}</p>
+                        <p class="text-xs mt-1" :style="{ color: 'var(--color-text-muted)' }">{{ order.scheduledAt ? 'Programado: ' + new Date(order.scheduledAt).toLocaleString('es-MX') : 'Lo antes posible' }}</p>
                     </div>
                 </div>
             </div>
 
             <!-- Payment method -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
-                <h2 class="text-sm font-bold text-gray-900 mb-3">Método de pago</h2>
+            <div class="rounded-2xl border p-5 mb-4" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                <h2 class="text-sm font-bold mb-3" :style="{ color: 'var(--color-text)' }">Método de pago</h2>
 
-                <div v-if="paymentMethods.length === 0" class="text-sm text-gray-400 text-center py-2">
+                <div v-if="paymentMethods.length === 0" class="text-sm text-center py-2" :style="{ color: 'var(--color-text-muted)' }">
                     Sin métodos de pago disponibles.
                 </div>
 
@@ -246,20 +305,22 @@ const selectedPmDetails = computed(() =>
                         @click="selectedPaymentMethod = pm.type"
                         class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all text-left"
                         :class="selectedPaymentMethod === pm.type
-                            ? 'border-[#FF5722] bg-orange-50'
-                            : 'border-gray-100 bg-gray-50'"
+                            ? 'bg-orange-50'
+                            : ''"
+                        :style="selectedPaymentMethod === pm.type ? { borderColor: 'var(--color-secondary)' } : { borderColor: 'var(--color-border-light)', backgroundColor: 'var(--color-input-bg)' }"
                     >
                         <div
                             class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
-                            :class="selectedPaymentMethod === pm.type ? 'border-[#FF5722] bg-[#FF5722]' : 'border-gray-300'"
+                            :class="selectedPaymentMethod === pm.type ? '' : 'border-gray-300'"
+                            :style="selectedPaymentMethod === pm.type ? { borderColor: 'var(--color-secondary)', backgroundColor: 'var(--color-secondary)' } : {}"
                         >
                             <span v-if="selectedPaymentMethod === pm.type" class="material-symbols-outlined text-white text-xs">check</span>
                         </div>
                         <div>
-                            <p class="text-sm font-semibold text-gray-900">
+                            <p class="text-sm font-semibold" :style="{ color: 'var(--color-text)' }">
                                 {{ pm.type === 'cash' ? 'Efectivo' : pm.type === 'terminal' ? 'Terminal bancaria' : 'Transferencia (SPEI)' }}
                             </p>
-                            <p class="text-xs text-gray-500">
+                            <p class="text-xs" :style="{ color: 'var(--color-text-secondary)' }">
                                 {{ pm.type === 'cash' ? 'Pagas al recibir' : pm.type === 'terminal' ? 'Tarjeta débito/crédito' : 'Pago por SPEI' }}
                             </p>
                         </div>
@@ -267,10 +328,10 @@ const selectedPmDetails = computed(() =>
                 </div>
 
                 <!-- Cash: "pays with" input -->
-                <div v-if="selectedPaymentMethod === 'cash'" class="mt-4 bg-gray-50 rounded-2xl p-4">
-                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Con cuánto pagas?</label>
+                <div v-if="selectedPaymentMethod === 'cash'" class="mt-4 rounded-2xl p-4" :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border-light)' }">
+                    <label class="block text-xs font-semibold uppercase tracking-wide mb-2" :style="{ color: 'var(--color-text-secondary)' }">Con cuánto pagas?</label>
                     <div class="flex items-center gap-2">
-                        <span class="text-gray-500 font-semibold">$</span>
+                        <span class="font-semibold" :style="{ color: 'var(--color-text-secondary)' }">$</span>
                         <input
                             v-model="cashAmount"
                             type="number"
@@ -279,54 +340,123 @@ const selectedPmDetails = computed(() =>
                             max="100000"
                             step="any"
                             placeholder="Ej: 500"
-                            class="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30"
+                            class="flex-1 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+                            :style="{ backgroundColor: 'var(--color-input-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)', '--tw-ring-color': 'var(--color-secondary-ring)' }"
                         />
                     </div>
                     <p v-if="cashAmount && parseFloat(cashAmount) <= 0" class="text-xs text-red-500 mt-1">El monto debe ser mayor a cero.</p>
                     <p v-else-if="cashAmount && parseFloat(cashAmount) > 100000" class="text-xs text-red-500 mt-1">El monto maximo es $100,000.</p>
                     <p v-else-if="cashAmount && parseFloat(cashAmount) < total" class="text-xs text-red-500 mt-1">El monto debe ser igual o mayor al total (${{ total.toFixed(2) }})</p>
-                    <p v-else-if="cashAmount && parseFloat(cashAmount) >= total" class="text-xs text-gray-400 mt-1">Cambio: ${{ (parseFloat(cashAmount) - total).toFixed(2) }}</p>
+                    <p v-else-if="cashAmount && parseFloat(cashAmount) >= total" class="text-xs mt-1" :style="{ color: 'var(--color-text-muted)' }">Cambio: ${{ (parseFloat(cashAmount) - total).toFixed(2) }}</p>
                     <p v-if="!cashAmount" class="text-xs text-red-500 mt-1">Indica con cuanto pagas para calcular tu cambio.</p>
                 </div>
 
                 <!-- Transfer bank details -->
                 <div
                     v-if="selectedPaymentMethod === 'transfer' && selectedPmDetails"
-                    class="mt-4 bg-gray-50 rounded-2xl p-4 text-sm"
+                    class="mt-4 rounded-2xl p-4 text-sm"
+                    :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border-light)' }"
                 >
-                    <p class="font-semibold text-gray-900 mb-2">Datos bancarios</p>
-                    <p class="text-gray-600">Banco: <span class="font-medium">{{ selectedPmDetails.bank_name }}</span></p>
-                    <p class="text-gray-600">Titular: <span class="font-medium">{{ selectedPmDetails.account_holder }}</span></p>
-                    <p class="text-gray-600">CLABE: <span class="font-mono font-medium">{{ selectedPmDetails.clabe }}</span></p>
+                    <p class="font-semibold mb-2" :style="{ color: 'var(--color-text)' }">Datos bancarios</p>
+                    <p :style="{ color: 'var(--color-text-secondary)' }">Banco: <span class="font-medium">{{ selectedPmDetails.bank_name }}</span></p>
+                    <p :style="{ color: 'var(--color-text-secondary)' }">Titular: <span class="font-medium">{{ selectedPmDetails.account_holder }}</span></p>
+                    <p :style="{ color: 'var(--color-text-secondary)' }">CLABE: <span class="font-mono font-medium">{{ selectedPmDetails.clabe }}</span></p>
                 </div>
             </div>
 
+            <!-- Invoice toggle -->
+            <label class="flex items-center gap-3 rounded-2xl border p-4 cursor-pointer touch-manipulation"
+                :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: requiresInvoice ? 'var(--color-secondary)' : 'var(--color-border-light)' }"
+            >
+                <input
+                    v-model="requiresInvoice"
+                    type="checkbox"
+                    class="sr-only"
+                />
+                <span
+                    class="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors"
+                    :style="requiresInvoice
+                        ? { backgroundColor: 'var(--color-secondary)', borderColor: 'var(--color-secondary)' }
+                        : { borderColor: 'var(--color-border)' }"
+                >
+                    <span v-if="requiresInvoice" class="material-symbols-outlined text-white" style="font-size: 14px">check</span>
+                </span>
+                <div>
+                    <p class="text-sm font-semibold" :style="{ color: 'var(--color-text)' }">Requiere factura?</p>
+                    <p class="text-xs" :style="{ color: 'var(--color-text-secondary)' }">Marca si necesitas factura para este pedido.</p>
+                </div>
+            </label>
+
+            <!-- Coupon section -->
+            <div class="rounded-2xl border p-5 mb-4 mt-4" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                <h2 class="text-sm font-bold mb-3" :style="{ color: 'var(--color-text)' }">¿Tienes un cupón?</h2>
+
+                <div v-if="!couponApplied" class="flex gap-2">
+                    <input
+                        v-model="couponInput"
+                        type="text"
+                        maxlength="20"
+                        placeholder="Código del cupón"
+                        class="flex-1 rounded-xl px-4 py-2.5 text-sm uppercase focus:outline-none focus:ring-2"
+                        :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', '--tw-ring-color': 'var(--color-secondary-ring)' }"
+                        @keyup.enter="applyCoupon"
+                    />
+                    <button
+                        @click="applyCoupon"
+                        :disabled="couponLoading || !couponInput.trim()"
+                        class="px-4 py-2.5 rounded-xl text-sm font-semibold text-white shrink-0 disabled:opacity-40"
+                        :style="{ backgroundColor: 'var(--color-secondary)' }"
+                    >
+                        {{ couponLoading ? '...' : 'Aplicar' }}
+                    </button>
+                </div>
+
+                <div v-else class="flex items-center justify-between rounded-xl px-4 py-3" style="background-color: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3)">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-green-600 text-lg">confirmation_number</span>
+                        <div>
+                            <p class="text-sm font-semibold text-green-700">{{ couponLabel }}</p>
+                            <p class="text-xs text-green-600">-${{ couponDiscount.toFixed(2) }} de descuento</p>
+                        </div>
+                    </div>
+                    <button @click="removeCoupon" class="p-1 rounded-full hover:bg-green-100 transition-colors">
+                        <span class="material-symbols-outlined text-green-600 text-lg">close</span>
+                    </button>
+                </div>
+
+                <p v-if="couponError" class="text-xs text-red-500 mt-2">{{ couponError }}</p>
+            </div>
+
             <!-- Order summary (mobile only) -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-4 md:hidden">
-                <h2 class="text-sm font-bold text-gray-900 mb-3">Resumen del pedido</h2>
+            <div class="rounded-2xl border p-5 mb-4 md:hidden" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                <h2 class="text-sm font-bold mb-3" :style="{ color: 'var(--color-text)' }">Resumen del pedido</h2>
 
                 <div class="space-y-2 mb-3">
                     <div v-for="(item, index) in cart.items" :key="index" class="flex justify-between text-sm">
                         <div>
-                            <span class="text-gray-700">{{ item.quantity }}x {{ item.product_name }}</span>
-                            <div v-if="item.modifiers.length > 0" class="text-xs text-gray-400">{{ item.modifiers.map(m => m.name).join(', ') }}</div>
+                            <span :style="{ color: 'var(--color-text)' }">{{ item.quantity }}x {{ item.product_name }}</span>
+                            <div v-if="item.modifiers.length > 0" class="text-xs" :style="{ color: 'var(--color-text-muted)' }">{{ item.modifiers.map(m => m.name).join(', ') }}</div>
                         </div>
-                        <span class="font-medium text-gray-900 shrink-0">${{ item.item_total.toFixed(2) }}</span>
+                        <span class="font-medium shrink-0" :style="{ color: 'var(--color-text)' }">${{ item.item_total.toFixed(2) }}</span>
                     </div>
                 </div>
 
-                <div class="border-t border-gray-100 pt-3 space-y-1">
-                    <div class="flex justify-between text-sm text-gray-600">
+                <div class="border-t pt-3 space-y-1" :style="{ borderColor: 'var(--color-border-light)' }">
+                    <div class="flex justify-between text-sm" :style="{ color: 'var(--color-text-secondary)' }">
                         <span>Subtotal</span>
                         <span>${{ cart.subtotal.toFixed(2) }}</span>
                     </div>
-                    <div class="flex justify-between text-sm text-gray-600">
+                    <div v-if="couponDiscount > 0" class="flex justify-between text-sm text-green-600">
+                        <span>Descuento ({{ couponLabel }})</span>
+                        <span>-${{ couponDiscount.toFixed(2) }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm" :style="{ color: 'var(--color-text-secondary)' }">
                         <span>Envio</span>
                         <span>${{ order.deliveryCost.toFixed(2) }}</span>
                     </div>
-                    <div class="flex justify-between font-bold text-base pt-1">
+                    <div class="flex justify-between font-bold text-base pt-1" :style="{ color: 'var(--color-text)' }">
                         <span>Total</span>
-                        <span class="text-[#FF5722]">${{ total.toFixed(2) }}</span>
+                        <span :style="{ color: 'var(--color-secondary)' }">${{ total.toFixed(2) }}</span>
                     </div>
                 </div>
             </div>
@@ -339,39 +469,43 @@ const selectedPmDetails = computed(() =>
                 </div>
             </div>
 
-            <p class="text-xs text-gray-400 text-center px-4 md:hidden">
+            <p class="text-xs text-center px-4 md:hidden" :style="{ color: 'var(--color-text-muted)' }">
                 Al confirmar, se abrira WhatsApp con los detalles de tu pedido.
             </p>
         </div>
 
             <!-- Desktop: Order summary sidebar (right) -->
             <div class="hidden md:block md:w-80 md:shrink-0">
-                <div class="sticky top-[85px] bg-white border border-gray-100 rounded-2xl p-5">
-                    <h3 class="font-bold text-gray-900 mb-4">Resumen del pedido</h3>
+                <div class="sticky top-[85px] border rounded-2xl p-5" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                    <h3 class="font-bold mb-4" :style="{ color: 'var(--color-text)' }">Resumen del pedido</h3>
 
                     <div class="space-y-2 mb-4 max-h-52 overflow-y-auto">
                         <div v-for="(item, i) in cart.items" :key="i" class="flex items-start gap-3">
                             <img v-if="item.product_image" :src="item.product_image" class="w-10 h-10 rounded-lg object-cover shrink-0" />
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 leading-snug">{{ item.quantity }}x {{ item.product_name }}</p>
-                                <p v-if="item.modifiers.length" class="text-xs text-gray-400 truncate">{{ item.modifiers.map(m => m.name).join(', ') }}</p>
+                                <p class="text-sm font-medium leading-snug" :style="{ color: 'var(--color-text)' }">{{ item.quantity }}x {{ item.product_name }}</p>
+                                <p v-if="item.modifiers.length" class="text-xs truncate" :style="{ color: 'var(--color-text-muted)' }">{{ item.modifiers.map(m => m.name).join(', ') }}</p>
                             </div>
-                            <span class="text-sm font-semibold text-gray-700 shrink-0">${{ item.item_total.toFixed(2) }}</span>
+                            <span class="text-sm font-semibold shrink-0" :style="{ color: 'var(--color-text)' }">${{ item.item_total.toFixed(2) }}</span>
                         </div>
                     </div>
 
-                    <div class="border-t border-gray-100 pt-3 space-y-1 mb-4">
-                        <div class="flex justify-between text-sm text-gray-600">
+                    <div class="border-t pt-3 space-y-1 mb-4" :style="{ borderColor: 'var(--color-border-light)' }">
+                        <div class="flex justify-between text-sm" :style="{ color: 'var(--color-text-secondary)' }">
                             <span>Subtotal</span>
                             <span>${{ cart.subtotal.toFixed(2) }}</span>
                         </div>
-                        <div class="flex justify-between text-sm text-gray-600">
+                        <div v-if="couponDiscount > 0" class="flex justify-between text-sm text-green-600">
+                            <span>Descuento ({{ couponLabel }})</span>
+                            <span>-${{ couponDiscount.toFixed(2) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm" :style="{ color: 'var(--color-text-secondary)' }">
                             <span>Envio</span>
                             <span>${{ order.deliveryCost.toFixed(2) }}</span>
                         </div>
-                        <div class="flex justify-between font-bold text-base pt-1">
+                        <div class="flex justify-between font-bold text-base pt-1" :style="{ color: 'var(--color-text)' }">
                             <span>Total</span>
-                            <span class="text-[#FF5722]">${{ total.toFixed(2) }}</span>
+                            <span :style="{ color: 'var(--color-secondary)' }">${{ total.toFixed(2) }}</span>
                         </div>
                     </div>
 
@@ -379,13 +513,14 @@ const selectedPmDetails = computed(() =>
                         @click="confirm"
                         :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) < total || parseFloat(cashAmount) > 100000))"
                         class="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
-                        :class="submitting ? 'bg-gray-300 text-gray-500' : 'bg-[#FF5722] text-white hover:bg-[#D84315]'"
+                        :class="submitting ? 'bg-gray-300 text-gray-500' : 'text-white hover:brightness-90'"
+                        :style="!submitting ? { backgroundColor: 'var(--color-secondary)' } : {}"
                     >
                         <span class="material-symbols-outlined text-lg" style="font-variation-settings:'FILL' 1">send</span>
                         {{ submitting ? 'Registrando...' : 'Confirmar y enviar' }}
                     </button>
 
-                    <p class="text-xs text-gray-400 text-center mt-3">
+                    <p class="text-xs text-center mt-3" :style="{ color: 'var(--color-text-muted)' }">
                         Al confirmar, se abrira WhatsApp con los detalles de tu pedido.
                     </p>
                 </div>
@@ -398,7 +533,8 @@ const selectedPmDetails = computed(() =>
             <button
                 @click="confirm"
                 :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) < total || parseFloat(cashAmount) > 100000))"
-                class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
+                class="w-full text-white rounded-2xl py-4 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
+                :style="{ backgroundColor: 'var(--color-secondary)' }"
             >
                 <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">send</span>
                 {{ submitting ? 'Registrando pedido...' : 'Confirmar y enviar por WhatsApp' }}

@@ -6,8 +6,12 @@ import { useRestaurantStore } from '@/stores/restaurant'
 const restaurantStore = useRestaurantStore()
 
 onMounted(async () => {
+    console.log('[PideAqui] App mounted, fetching restaurant...')
     await restaurantStore.fetchRestaurant()
+    console.log('[PideAqui] Restaurant loaded:', restaurantStore.restaurant?.name, 'primary_color:', restaurantStore.restaurant?.primary_color)
+    console.log('[PideAqui] CSS --color-primary:', getComputedStyle(document.documentElement).getPropertyValue('--color-primary'))
     await restaurantStore.fetchMenu()
+    console.log('[PideAqui] Menu loaded:', restaurantStore.menu?.length, 'categories')
 
     // Set favicon to restaurant logo
     const logo = restaurantStore.restaurant?.logo_url
@@ -32,7 +36,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="min-h-dvh bg-[#f6f8f7]">
+    <div class="min-h-dvh" style="background-color: var(--color-primary)">
         <RouterView />
     </div>
 </template>

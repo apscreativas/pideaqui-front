@@ -25,8 +25,6 @@ function applyTheme(data) {
     const root = document.documentElement
     const primary = data.primary_color || '#f6f8f7'
     const secondary = data.secondary_color || '#FF5722'
-    console.log('[PideAqui] applyTheme called — primary:', primary, 'secondary:', secondary, 'raw:', data.primary_color, data.secondary_color)
-    console.log('[PideAqui] root element:', root.tagName, 'style before:', root.style.cssText)
     const secondaryDark = darkenHex(secondary, 0.78)
     const textOnSecondary = hexToLinear(secondary) > 0.4 ? '#1a1a1a' : '#ffffff'
 
@@ -35,8 +33,6 @@ function applyTheme(data) {
 
     root.style.setProperty('--color-primary', primary)
     root.style.setProperty('--color-secondary', secondary)
-    console.log('[PideAqui] style after setProperty:', root.style.cssText)
-    console.log('[PideAqui] getComputedStyle --color-primary:', getComputedStyle(root).getPropertyValue('--color-primary'))
     root.style.setProperty('--color-secondary-dark', secondaryDark)
     root.style.setProperty('--color-secondary-light', secondary + '1a')
     root.style.setProperty('--color-secondary-ring', secondary + '4d')

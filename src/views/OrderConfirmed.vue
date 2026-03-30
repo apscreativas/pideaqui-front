@@ -87,14 +87,15 @@ function resendWhatsapp() {
     <div class="min-h-dvh flex flex-col" style="background-color: var(--color-primary)">
 
         <!-- Header -->
-        <header class="flex items-center p-4 pb-2 z-10">
+        <header class="flex items-center px-4 py-3 z-10">
             <button
                 @click="goBack"
-                class="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                class="w-9 h-9 flex items-center justify-center rounded-full border transition-colors"
+                :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }"
             >
-                <span class="material-symbols-outlined text-2xl" :style="{ color: 'var(--color-text)' }">close</span>
+                <span class="material-symbols-outlined text-xl" :style="{ color: 'var(--color-text-secondary)' }">close</span>
             </button>
-            <h1 class="text-lg font-bold tracking-tight flex-1 text-center pr-10" :style="{ color: 'var(--color-text)' }">
+            <h1 class="text-base font-bold flex-1 text-center pr-10" :style="{ color: 'var(--color-text)' }">
                 {{ restaurantStore.restaurant?.name ?? '' }}
             </h1>
         </header>
@@ -127,7 +128,7 @@ function resendWhatsapp() {
             </div>
 
             <!-- Order summary card -->
-            <div v-if="summary" class="w-full rounded-xl shadow-sm overflow-hidden" :style="{ backgroundColor: 'var(--color-card-bg)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--color-border-light)' }">
+            <div v-if="summary" class="w-full rounded-2xl shadow-sm overflow-hidden" :style="{ backgroundColor: 'var(--color-card-bg)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'var(--color-border-light)' }">
                 <!-- Gradient header -->
                 <div class="relative h-32 w-full" style="background: linear-gradient(to right, var(--color-secondary), var(--color-secondary-dark))">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
@@ -160,7 +161,7 @@ function resendWhatsapp() {
                 </div>
 
                 <!-- Totals -->
-                <div class="p-4 bg-gray-50">
+                <div class="p-4" :style="{ backgroundColor: 'var(--color-border-light)' }">
                     <div class="flex justify-between items-center mb-1">
                         <p class="text-sm" :style="{ color: 'var(--color-text-secondary)' }">Subtotal</p>
                         <p class="text-sm font-medium" :style="{ color: 'var(--color-text)' }">${{ summary.subtotal.toFixed(2) }}</p>
@@ -187,14 +188,14 @@ function resendWhatsapp() {
                 <button
                     v-if="order.branchWhatsapp && order.confirmedOrderId"
                     @click="resendWhatsapp"
-                    class="w-full h-12 rounded-full bg-[#25D366] hover:bg-[#1ebe57] text-white font-bold text-base tracking-wide shadow-lg shadow-[#25D366]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    class="w-full py-4 rounded-2xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-bold text-base shadow-lg shadow-[#25D366]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
                     <span class="material-symbols-outlined text-xl">chat</span>
                     Reenviar por WhatsApp
                 </button>
                 <button
                     @click="goBack"
-                    class="w-full h-12 rounded-full text-white font-bold text-base tracking-wide shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:brightness-90"
+                    class="w-full py-4 rounded-2xl text-white font-bold text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:brightness-90"
                     :style="{ backgroundColor: 'var(--color-secondary)', boxShadow: '0 10px 15px -3px var(--color-secondary-ring)' }"
                 >
                     Volver al menú

@@ -23,12 +23,13 @@ const isAvailable = computed(() =>
             <button
                 @click="isAvailable && router.push('/cart')"
                 :disabled="!isAvailable"
-                class="w-full text-white rounded-2xl px-5 py-4 flex items-center justify-between shadow-lg active:scale-[0.98] transition-transform"
-                :class="isAvailable ? 'bg-[#FF5722] shadow-orange-500/30' : 'bg-gray-400 shadow-gray-300/30 cursor-not-allowed'"
+                class="w-full text-white rounded-2xl px-5 py-4 flex items-center justify-between shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform"
+                :class="isAvailable ? 'shadow-orange-500/30' : 'bg-gray-400 shadow-gray-300/30 cursor-not-allowed'"
+                :style="isAvailable ? { backgroundColor: 'var(--color-secondary)' } : {}"
             >
                 <div class="flex items-center gap-3">
                     <span class="bg-white/20 rounded-xl px-2.5 py-0.5 text-sm font-bold">{{ cart.totalItems }}</span>
-                    <span class="font-semibold">Ver carrito</span>
+                    <span class="font-bold">Ver carrito</span>
                 </div>
                 <span class="font-bold">${{ cart.subtotal.toFixed(2) }}</span>
             </button>

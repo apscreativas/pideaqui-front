@@ -227,21 +227,21 @@ const selectedPmDetails = computed(() =>
                 <div class="space-y-3">
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide mb-1" :style="{ color: 'var(--color-text-secondary)' }">Nombre completo</label>
-                        <div class="flex items-center gap-2 rounded-xl px-4 py-3" :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border)' }">
+                        <div class="flex items-center gap-2 rounded-2xl px-4 py-3 focus-within:ring-2" :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border)', '--tw-ring-color': 'var(--color-secondary-ring)' }">
                             <span class="material-symbols-outlined text-lg" :style="{ color: 'var(--color-text-muted)' }">person</span>
                             <input
                                 v-model="customerName"
                                 type="text"
                                 maxlength="255"
                                 placeholder="Juan Pérez"
-                                class="flex-1 bg-transparent text-sm focus:outline-none"
+                                class="flex-1 bg-transparent text-sm focus:outline-none focus:ring-0"
                                 :style="{ color: 'var(--color-text)' }"
                             />
                         </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide mb-1" :style="{ color: 'var(--color-text-secondary)' }">Teléfono</label>
-                        <div class="flex items-center gap-2 rounded-xl px-4 py-3" :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border)' }">
+                        <div class="flex items-center gap-2 rounded-2xl px-4 py-3 focus-within:ring-2" :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border)', '--tw-ring-color': 'var(--color-secondary-ring)' }">
                             <span class="material-symbols-outlined text-lg" :style="{ color: 'var(--color-text-muted)' }" aria-hidden="true">phone</span>
                             <input
                                 v-model="customerPhone"
@@ -252,7 +252,7 @@ const selectedPmDetails = computed(() =>
                                 name="phone"
                                 autocomplete="tel-national"
                                 placeholder="5512345678"
-                                class="flex-1 bg-transparent text-sm focus-visible:outline-none"
+                                class="flex-1 bg-transparent text-sm focus-visible:outline-none focus:ring-0"
                                 :style="{ color: 'var(--color-text)' }"
                             />
                         </div>
@@ -305,9 +305,9 @@ const selectedPmDetails = computed(() =>
                         @click="selectedPaymentMethod = pm.type"
                         class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all text-left"
                         :class="selectedPaymentMethod === pm.type
-                            ? 'bg-orange-50'
+                            ? ''
                             : ''"
-                        :style="selectedPaymentMethod === pm.type ? { borderColor: 'var(--color-secondary)' } : { borderColor: 'var(--color-border-light)', backgroundColor: 'var(--color-input-bg)' }"
+                        :style="selectedPaymentMethod === pm.type ? { borderColor: 'var(--color-secondary)', backgroundColor: 'var(--color-secondary-light)' } : { borderColor: 'var(--color-border-light)', backgroundColor: 'var(--color-input-bg)' }"
                     >
                         <div
                             class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
@@ -397,7 +397,7 @@ const selectedPmDetails = computed(() =>
                         type="text"
                         maxlength="20"
                         placeholder="Código del cupón"
-                        class="flex-1 rounded-xl px-4 py-2.5 text-sm uppercase focus:outline-none focus:ring-2"
+                        class="flex-1 rounded-2xl px-4 py-3 text-sm uppercase focus:outline-none focus:ring-2"
                         :style="{ backgroundColor: 'var(--color-input-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', '--tw-ring-color': 'var(--color-secondary-ring)' }"
                         @keyup.enter="applyCoupon"
                     />
@@ -533,7 +533,7 @@ const selectedPmDetails = computed(() =>
             <button
                 @click="confirm"
                 :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) < total || parseFloat(cashAmount) > 100000))"
-                class="w-full text-white rounded-2xl py-4 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
+                class="w-full text-white rounded-2xl py-4 font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
                 :style="{ backgroundColor: 'var(--color-secondary)' }"
             >
                 <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">send</span>

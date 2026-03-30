@@ -6,7 +6,6 @@ const api = axios.create({
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'X-Restaurant-Token': import.meta.env.VITE_RESTAURANT_TOKEN || '',
-        'ngrok-skip-browser-warning': 'true',
     },
 })
 

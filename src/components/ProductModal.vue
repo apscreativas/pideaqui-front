@@ -206,8 +206,9 @@ function addToCart() {
                             <span
                                 v-if="isMultiple(group) && group.max_selections"
                                 class="text-xs px-2 py-0.5 rounded-full font-medium"
-                                :class="isMaxReached(group) ? 'bg-orange-100 text-orange-700' : ''"
-                                :style="!isMaxReached(group) ? { backgroundColor: 'var(--color-border-light)', color: 'var(--color-text-secondary)' } : {}"
+                                :style="isMaxReached(group)
+                                    ? { backgroundColor: 'var(--color-secondary-light)', color: 'var(--color-secondary)' }
+                                    : { backgroundColor: 'var(--color-border-light)', color: 'var(--color-text-secondary)' }"
                             >{{ (selections[groupKey(group)]?.size || 0) }}/{{ group.max_selections }}</span>
                             <span
                                 v-else-if="isMultiple(group)"

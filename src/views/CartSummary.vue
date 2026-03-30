@@ -1,10 +1,12 @@
 <script setup>
 import { useCartStore } from '@/stores/cart'
 import { useOrderStore } from '@/stores/order'
+import { useRestaurantStore } from '@/stores/restaurant'
 import { useRouter } from 'vue-router'
 
 const cart = useCartStore()
 const order = useOrderStore()
+const { restaurant } = useRestaurantStore()
 const router = useRouter()
 
 function proceed() {
@@ -14,18 +16,19 @@ function proceed() {
 </script>
 
 <template>
-    <div class="min-h-dvh bg-[#f6f8f7]">
+    <div class="min-h-dvh" style="background-color: var(--color-primary)">
 
         <!-- Header -->
-        <header class="sticky top-0 z-10 bg-[#f6f8f7] border-b border-gray-100 px-4 py-3">
+        <header class="sticky top-0 z-10 border-b px-4 py-3" :style="{ backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-border-light)' }">
             <div class="max-w-md md:max-w-4xl mx-auto flex items-center gap-3">
                 <button
                     @click="router.back()"
-                    class="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-100"
+                    class="w-9 h-9 flex items-center justify-center rounded-full border"
+                    :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }"
                 >
-                    <span class="material-symbols-outlined text-gray-600 text-xl">arrow_back</span>
+                    <span class="material-symbols-outlined text-xl" :style="{ color: 'var(--color-text-secondary)' }">arrow_back</span>
                 </button>
-                <h1 class="text-base font-bold text-gray-900">Tu carrito</h1>
+                <h1 class="text-base font-bold" :style="{ color: 'var(--color-text)' }">Tu carrito</h1>
             </div>
         </header>
 
@@ -33,12 +36,13 @@ function proceed() {
 
             <!-- Empty cart -->
             <div v-if="cart.items.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
-                <span class="material-symbols-outlined text-6xl text-gray-300 mb-4" style="font-variation-settings:'FILL' 1">shopping_cart</span>
-                <h2 class="text-lg font-bold text-gray-700 mb-2">Tu carrito está vacío</h2>
-                <p class="text-sm text-gray-500 mb-6">Agrega productos del menú para continuar.</p>
+                <span class="material-symbols-outlined text-6xl mb-4" style="font-variation-settings:'FILL' 1" :style="{ color: 'var(--color-text-muted)' }">shopping_cart</span>
+                <h2 class="text-lg font-bold mb-2" :style="{ color: 'var(--color-text)' }">Tu carrito está vacío</h2>
+                <p class="text-sm mb-6" :style="{ color: 'var(--color-text-secondary)' }">Agrega productos del menú para continuar.</p>
                 <button
                     @click="router.push('/')"
-                    class="bg-[#FF5722] text-white rounded-2xl px-6 py-3 font-semibold text-sm"
+                    class="rounded-2xl px-6 py-3 font-semibold text-sm hover:brightness-90 transition"
+                    :style="{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)' }"
                 >
                     Ver el menú
                 </button>
@@ -52,55 +56,65 @@ function proceed() {
                     <div
                         v-for="(item, index) in cart.items"
                         :key="index"
-                        class="bg-white rounded-2xl border border-gray-100 p-4 flex gap-3"
+                        class="rounded-2xl border p-4 flex gap-3"
+                        :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }"
                     >
-                        <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0">
+                        <div class="w-16 h-16 rounded-xl overflow-hidden shrink-0" :style="{ backgroundColor: 'var(--color-border-light)' }">
                             <img
                                 v-if="item.product_image"
                                 :src="item.product_image"
                                 :alt="item.product_name"
                                 class="w-full h-full object-cover"
                             />
+                            <img
+                                v-else-if="restaurant?.default_product_image_url"
+                                :src="restaurant.default_product_image_url"
+                                :alt="item.product_name"
+                                class="w-full h-full object-cover"
+                            />
                             <div v-else class="w-full h-full flex items-center justify-center">
-                                <span class="material-symbols-outlined text-gray-300 text-2xl" style="font-variation-settings:'FILL' 1">fastfood</span>
+                                <span class="material-symbols-outlined text-2xl" style="font-variation-settings:'FILL' 1" :style="{ color: 'var(--color-text-muted)' }">fastfood</span>
                             </div>
                         </div>
 
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start justify-between gap-2 mb-1">
-                                <p class="font-semibold text-gray-900 text-sm leading-tight">{{ item.product_name }}</p>
+                                <p class="font-semibold text-sm leading-tight" :style="{ color: 'var(--color-text)' }">{{ item.product_name }}</p>
                                 <button
                                     @click="cart.removeItem(index)"
-                                    class="shrink-0 w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-400"
+                                    class="shrink-0 w-5 h-5 flex items-center justify-center hover:text-red-400"
+                                    :style="{ color: 'var(--color-text-muted)' }"
                                 >
                                     <span class="material-symbols-outlined text-base">delete</span>
                                 </button>
                             </div>
 
-                            <div v-if="item.modifiers.length > 0" class="text-xs text-gray-400 mb-1">
+                            <div v-if="item.modifiers.length > 0" class="text-xs mb-1" :style="{ color: 'var(--color-text-muted)' }">
                                 {{ item.modifiers.map(m => m.name).join(', ') }}
                             </div>
-                            <div v-if="item.notes" class="text-xs text-gray-400 italic mb-2">
+                            <div v-if="item.notes" class="text-xs italic mb-2" :style="{ color: 'var(--color-text-muted)' }">
                                 "{{ item.notes }}"
                             </div>
 
                             <div class="flex items-center justify-between mt-2">
-                                <div class="flex items-center gap-2 bg-gray-100 rounded-xl px-2 py-1">
+                                <div class="flex items-center gap-2 rounded-xl px-2 py-1" :style="{ backgroundColor: 'var(--color-border-light)' }">
                                     <button
                                         @click="cart.updateQuantity(index, item.quantity - 1)"
-                                        class="w-5 h-5 flex items-center justify-center text-gray-600"
+                                        class="w-5 h-5 flex items-center justify-center"
+                                        :style="{ color: 'var(--color-text-secondary)' }"
                                     >
                                         <span class="material-symbols-outlined text-sm">remove</span>
                                     </button>
-                                    <span class="text-sm font-bold text-gray-900 w-4 text-center">{{ item.quantity }}</span>
+                                    <span class="text-sm font-bold w-4 text-center" :style="{ color: 'var(--color-text)' }">{{ item.quantity }}</span>
                                     <button
                                         @click="cart.updateQuantity(index, item.quantity + 1)"
-                                        class="w-5 h-5 flex items-center justify-center text-gray-600"
+                                        class="w-5 h-5 flex items-center justify-center"
+                                        :style="{ color: 'var(--color-text-secondary)' }"
                                     >
                                         <span class="material-symbols-outlined text-sm">add</span>
                                     </button>
                                 </div>
-                                <p class="font-bold text-gray-900 text-sm">${{ item.item_total.toFixed(2) }}</p>
+                                <p class="font-bold text-sm" :style="{ color: 'var(--color-text)' }">${{ item.item_total.toFixed(2) }}</p>
                             </div>
                         </div>
                     </div>
@@ -109,7 +123,8 @@ function proceed() {
                 <!-- Add more -->
                 <button
                     @click="router.push('/')"
-                    class="flex items-center gap-2 text-[#FF5722] text-sm font-medium mb-6"
+                    class="flex items-center gap-2 text-sm font-medium mb-6"
+                    :style="{ color: 'var(--color-secondary)' }"
                 >
                     <span class="material-symbols-outlined text-lg">add_circle</span>
                     Agregar más productos
@@ -119,23 +134,24 @@ function proceed() {
 
                 <!-- Summary sidebar (desktop right) -->
                 <div class="md:w-80 md:shrink-0">
-                <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-6 md:sticky md:top-[85px]">
-                    <h3 class="hidden md:block font-bold text-gray-900 mb-4">Resumen del pedido</h3>
-                    <div class="flex justify-between text-sm text-gray-600 mb-2">
+                <div class="rounded-2xl border p-5 mb-6 md:sticky md:top-[85px]" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                    <h3 class="hidden md:block font-bold mb-4" :style="{ color: 'var(--color-text)' }">Resumen del pedido</h3>
+                    <div class="flex justify-between text-sm mb-2" :style="{ color: 'var(--color-text-secondary)' }">
                         <span>Subtotal</span>
-                        <span class="font-semibold text-gray-900">${{ cart.subtotal.toFixed(2) }}</span>
+                        <span class="font-semibold" :style="{ color: 'var(--color-text)' }">${{ cart.subtotal.toFixed(2) }}</span>
                     </div>
-                    <div class="flex justify-between text-xs text-gray-400 mb-3">
+                    <div class="flex justify-between text-xs mb-3" :style="{ color: 'var(--color-text-muted)' }">
                         <span>Envio</span>
                         <span>Se calcula en el siguiente paso</span>
                     </div>
-                    <div class="border-t border-gray-100 pt-3 flex justify-between font-bold text-base">
+                    <div class="border-t pt-3 flex justify-between font-bold text-base" :style="{ borderColor: 'var(--color-border-light)', color: 'var(--color-text)' }">
                         <span>Total</span>
-                        <span class="text-[#FF5722]">${{ cart.subtotal.toFixed(2) }}</span>
+                        <span :style="{ color: 'var(--color-secondary)' }">${{ cart.subtotal.toFixed(2) }}</span>
                     </div>
                     <button
                         @click="proceed"
-                        class="hidden md:block w-full mt-4 bg-[#FF5722] text-white rounded-xl py-3 font-semibold text-sm hover:bg-[#D84315] transition-colors"
+                        class="hidden md:block w-full mt-4 rounded-xl py-3 font-semibold text-sm hover:brightness-90 transition-colors"
+                        :style="{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)' }"
                     >
                         Continuar
                     </button>
@@ -149,7 +165,8 @@ function proceed() {
         <div v-if="cart.items.length > 0" class="fixed bottom-10 left-4 right-4 max-w-md mx-auto md:hidden">
             <button
                 @click="proceed"
-                class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform"
+                class="w-full rounded-2xl py-4 font-bold text-base shadow-lg active:scale-[0.98] transition-transform hover:brightness-90"
+                :style="{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)', boxShadow: '0 10px 15px -3px var(--color-secondary-ring)' }"
             >
                 Continuar →
             </button>

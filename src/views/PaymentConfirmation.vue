@@ -304,17 +304,16 @@ const selectedPmDetails = computed(() =>
                         :key="pm.type"
                         @click="selectedPaymentMethod = pm.type"
                         class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all text-left"
-                        :class="selectedPaymentMethod === pm.type
-                            ? 'bg-orange-50'
-                            : ''"
-                        :style="selectedPaymentMethod === pm.type ? { borderColor: 'var(--color-secondary)' } : { borderColor: 'var(--color-border-light)', backgroundColor: 'var(--color-input-bg)' }"
+                        :style="selectedPaymentMethod === pm.type
+                            ? { borderColor: 'var(--color-secondary)', backgroundColor: 'var(--color-secondary-light)' }
+                            : { borderColor: 'var(--color-border-light)', backgroundColor: 'var(--color-input-bg)' }"
                     >
                         <div
                             class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
-                            :class="selectedPaymentMethod === pm.type ? '' : 'border-gray-300'"
-                            :style="selectedPaymentMethod === pm.type ? { borderColor: 'var(--color-secondary)', backgroundColor: 'var(--color-secondary)' } : {}"
+                            :class="selectedPaymentMethod === pm.type ? '' : ''"
+                            :style="selectedPaymentMethod === pm.type ? { borderColor: 'var(--color-secondary)', backgroundColor: 'var(--color-secondary)' } : { borderColor: 'var(--color-border)' }"
                         >
-                            <span v-if="selectedPaymentMethod === pm.type" class="material-symbols-outlined text-white text-xs">check</span>
+                            <span v-if="selectedPaymentMethod === pm.type" class="material-symbols-outlined text-xs" :style="{ color: 'var(--color-text-on-secondary)' }">check</span>
                         </div>
                         <div>
                             <p class="text-sm font-semibold" :style="{ color: 'var(--color-text)' }">
@@ -404,8 +403,8 @@ const selectedPmDetails = computed(() =>
                     <button
                         @click="applyCoupon"
                         :disabled="couponLoading || !couponInput.trim()"
-                        class="px-4 py-2.5 rounded-xl text-sm font-semibold text-white shrink-0 disabled:opacity-40"
-                        :style="{ backgroundColor: 'var(--color-secondary)' }"
+                        class="px-4 py-2.5 rounded-xl text-sm font-semibold shrink-0 disabled:opacity-40"
+                        :style="{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)' }"
                     >
                         {{ couponLoading ? '...' : 'Aplicar' }}
                     </button>
@@ -513,8 +512,8 @@ const selectedPmDetails = computed(() =>
                         @click="confirm"
                         :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) < total || parseFloat(cashAmount) > 100000))"
                         class="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
-                        :class="submitting ? 'bg-gray-300 text-gray-500' : 'text-white hover:brightness-90'"
-                        :style="!submitting ? { backgroundColor: 'var(--color-secondary)' } : {}"
+                        :class="submitting ? '' : 'hover:brightness-90'"
+                        :style="!submitting ? { backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)' } : { backgroundColor: 'var(--color-border)', color: 'var(--color-text-muted)' }"
                     >
                         <span class="material-symbols-outlined text-lg" style="font-variation-settings:'FILL' 1">send</span>
                         {{ submitting ? 'Registrando...' : 'Confirmar y enviar' }}
@@ -533,8 +532,8 @@ const selectedPmDetails = computed(() =>
             <button
                 @click="confirm"
                 :disabled="!customerName || !/^\d{10}$/.test(customerPhone) || !selectedPaymentMethod || submitting || (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) < total || parseFloat(cashAmount) > 100000))"
-                class="w-full text-white rounded-2xl py-4 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
-                :style="{ backgroundColor: 'var(--color-secondary)' }"
+                class="w-full rounded-2xl py-4 font-bold text-base flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-transform disabled:opacity-40"
+                :style="{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)', boxShadow: '0 10px 15px -3px var(--color-secondary-ring)' }"
             >
                 <span class="material-symbols-outlined text-xl" style="font-variation-settings:'FILL' 1">send</span>
                 {{ submitting ? 'Registrando pedido...' : 'Confirmar y enviar por WhatsApp' }}

@@ -55,6 +55,15 @@ const scheduledAt = ref(order.scheduledAt || null)
 const showSchedule = ref(!!scheduledAt.value)
 
 const todaySchedule = computed(() => {
+    // Use resolved schedule from API (respects special dates > regular schedule).
+    const resolved = restaurant.value?.today_schedule
+    if (resolved && resolved.source !== 'closed' && resolved.opens_at) {
+        return { opens_at: resolved.opens_at, closes_at: resolved.closes_at, is_closed: false }
+    }
+    if (resolved?.source === 'closed') {
+        return { is_closed: true }
+    }
+    // Fallback to regular schedules if today_schedule not available.
     const schedules = restaurant.value?.schedules
     if (!schedules?.length) { return null }
     const today = new Date().getDay()
@@ -214,18 +223,19 @@ function formatPrice(v) {
 </script>
 
 <template>
-    <div class="min-h-dvh bg-[#f6f8f7]">
+    <div class="min-h-dvh" style="background-color: var(--color-primary)">
 
         <!-- Header -->
-        <header class="sticky top-0 z-10 bg-[#f6f8f7] border-b border-gray-100 px-4 py-3">
+        <header class="sticky top-0 z-10 border-b px-4 py-3" :style="{ backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-border-light)' }">
             <div class="max-w-6xl mx-auto flex items-center gap-3">
                 <button
                     @click="router.back()"
-                    class="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-100"
+                    class="w-9 h-9 flex items-center justify-center rounded-full border"
+                    :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }"
                 >
-                    <span class="material-symbols-outlined text-gray-600 text-xl">arrow_back</span>
+                    <span class="material-symbols-outlined text-xl" :style="{ color: 'var(--color-text-secondary)' }">arrow_back</span>
                 </button>
-                <h1 class="text-base font-bold text-gray-900">Como recibes tu pedido?</h1>
+                <h1 class="text-base font-bold" :style="{ color: 'var(--color-text)' }">Como recibes tu pedido?</h1>
             </div>
         </header>
 
@@ -250,9 +260,9 @@ function formatPrice(v) {
                     :key="type"
                     @click="selectedType = type; deliveryError = null; if (type === 'delivery' && !gpsResolved) requestGps()"
                     class="flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border transition-all text-sm font-medium"
-                    :class="selectedType === type
-                        ? 'bg-[#FF5722]/10 border-[#FF5722] text-[#FF5722]'
-                        : 'bg-white border-gray-100 text-gray-600'"
+                    :style="selectedType === type
+                        ? { backgroundColor: 'var(--color-secondary-light)', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)' }
+                        : { backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)', color: 'var(--color-text-secondary)' }"
                 >
                     <span
                         class="material-symbols-outlined text-2xl"
@@ -266,10 +276,11 @@ function formatPrice(v) {
             <template v-if="selectedType === 'delivery'">
                 <button
                     @click="requestGps"
-                    class="w-full flex items-center gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3 mb-3 text-sm font-medium text-gray-700"
+                    class="w-full flex items-center gap-3 border rounded-2xl px-4 py-3 mb-3 text-sm font-medium"
+                    :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)', color: 'var(--color-text)' }"
                     :class="{ 'opacity-60': locating }"
                 >
-                    <span class="material-symbols-outlined text-[#FF5722] text-xl" style="font-variation-settings:'FILL' 1">my_location</span>
+                    <span class="material-symbols-outlined text-xl" :style="{ color: 'var(--color-secondary)', fontVariationSettings: '\'FILL\' 1' }">my_location</span>
                     <span>{{ locating ? 'Obteniendo ubicacion...' : latitude ? 'Ubicacion obtenida' : 'Usar mi ubicacion actual' }}</span>
                 </button>
 
@@ -282,9 +293,9 @@ function formatPrice(v) {
 
                 <!-- Map -->
                 <div class="mb-4">
-                    <div v-if="!gpsResolved" class="w-full h-56 md:h-72 rounded-2xl bg-gray-100 flex flex-col items-center justify-center">
-                        <div class="w-8 h-8 rounded-full border-4 border-gray-200 border-t-[#FF5722] animate-spin mb-2"></div>
-                        <p class="text-xs text-gray-500">Obteniendo tu ubicacion...</p>
+                    <div v-if="!gpsResolved" class="w-full h-56 md:h-72 rounded-2xl flex flex-col items-center justify-center" :style="{ backgroundColor: 'var(--color-border-light)' }">
+                        <div class="w-8 h-8 rounded-full border-4 animate-spin mb-2" :style="{ borderColor: 'var(--color-border)', borderTopColor: 'var(--color-secondary)' }"></div>
+                        <p class="text-xs" :style="{ color: 'var(--color-text-secondary)' }">Obteniendo tu ubicacion...</p>
                     </div>
                     <MapPicker
                         v-else
@@ -298,24 +309,28 @@ function formatPrice(v) {
                 <!-- Address fields — 2-col grid on desktop -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Calle</label>
+                        <label class="block text-xs font-semibold mb-1 uppercase tracking-wide" :style="{ color: 'var(--color-text-secondary)' }">Calle</label>
                         <input v-model="addressStreet" type="text" maxlength="255" placeholder="Av. Alvaro Obregon"
-                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30" />
+                            class="w-full border rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[--color-secondary-ring]"
+                            :style="{ backgroundColor: 'var(--color-input-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }" />
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Numero exterior</label>
+                        <label class="block text-xs font-semibold mb-1 uppercase tracking-wide" :style="{ color: 'var(--color-text-secondary)' }">Numero exterior</label>
                         <input v-model="addressNumber" type="text" maxlength="50" placeholder="154"
-                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30" />
+                            class="w-full border rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[--color-secondary-ring]"
+                            :style="{ backgroundColor: 'var(--color-input-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }" />
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Colonia</label>
+                        <label class="block text-xs font-semibold mb-1 uppercase tracking-wide" :style="{ color: 'var(--color-text-secondary)' }">Colonia</label>
                         <input v-model="addressColony" type="text" maxlength="255" placeholder="Roma Norte"
-                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30" />
+                            class="w-full border rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[--color-secondary-ring]"
+                            :style="{ backgroundColor: 'var(--color-input-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }" />
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Referencias</label>
+                        <label class="block text-xs font-semibold mb-1 uppercase tracking-wide" :style="{ color: 'var(--color-text-secondary)' }">Referencias</label>
                         <input v-model="addressReferences" type="text" placeholder="Entre calles, color de casa..."
-                            class="w-full bg-white border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF5722]/30" />
+                            class="w-full border rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[--color-secondary-ring]"
+                            :style="{ backgroundColor: 'var(--color-input-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }" />
                     </div>
                 </div>
 
@@ -329,25 +344,26 @@ function formatPrice(v) {
 
             <!-- Pickup / Dine in: branch selection -->
             <template v-if="selectedType === 'pickup' || selectedType === 'dine_in'">
-                <div v-if="branches.length === 0" class="text-center py-8 text-sm text-gray-400">Sin sucursales disponibles.</div>
+                <div v-if="branches.length === 0" class="text-center py-8 text-sm" :style="{ color: 'var(--color-text-muted)' }">Sin sucursales disponibles.</div>
                 <div v-else class="space-y-3 mb-4">
                     <button
                         v-for="branch in branches"
                         :key="branch.id"
                         @click="selectedBranch = branch"
-                        class="w-full bg-white rounded-2xl border p-4 text-left transition-all"
-                        :class="selectedBranch?.id === branch.id ? 'border-[#FF5722] bg-orange-50' : 'border-gray-100'"
+                        class="w-full rounded-2xl border p-4 text-left transition-all"
+                        :style="selectedBranch?.id === branch.id ? { borderColor: 'var(--color-secondary)', backgroundColor: 'var(--color-secondary-light)' } : { backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }"
                     >
                         <div class="flex items-start gap-3">
                             <div
                                 class="w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0"
-                                :class="selectedBranch?.id === branch.id ? 'border-[#FF5722] bg-[#FF5722]' : 'border-gray-300'"
+                                :class="selectedBranch?.id === branch.id ? '' : ''"
+                                :style="selectedBranch?.id === branch.id ? { borderColor: 'var(--color-secondary)', backgroundColor: 'var(--color-secondary)' } : { borderColor: 'var(--color-border)' }"
                             >
-                                <span v-if="selectedBranch?.id === branch.id" class="material-symbols-outlined text-white text-xs">check</span>
+                                <span v-if="selectedBranch?.id === branch.id" class="material-symbols-outlined text-xs" :style="{ color: 'var(--color-text-on-secondary)' }">check</span>
                             </div>
                             <div>
-                                <p class="font-semibold text-gray-900 text-sm">{{ branch.name }}</p>
-                                <p class="text-xs text-gray-500 mt-0.5">{{ branch.address }}</p>
+                                <p class="font-semibold text-sm" :style="{ color: 'var(--color-text)' }">{{ branch.name }}</p>
+                                <p class="text-xs mt-0.5" :style="{ color: 'var(--color-text-secondary)' }">{{ branch.address }}</p>
                             </div>
                         </div>
                     </button>
@@ -355,23 +371,23 @@ function formatPrice(v) {
             </template>
 
             <!-- Schedule -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
-                <p class="text-sm font-semibold text-gray-900 mb-3">Para cuando?</p>
+            <div class="rounded-2xl border p-4 mb-4" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                <p class="text-sm font-semibold mb-3" :style="{ color: 'var(--color-text)' }">Para cuando?</p>
                 <div class="flex gap-2 mb-1">
                     <button
                         @click="scheduledAt = null; showSchedule = false"
                         class="flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all"
-                        :class="!scheduledAt ? 'bg-[#FF5722]/10 border-[#FF5722] text-[#FF5722]' : 'border-gray-100 text-gray-600'"
+                        :style="!scheduledAt ? { backgroundColor: 'var(--color-secondary-light)', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)' } : { borderColor: 'var(--color-border-light)', color: 'var(--color-text-secondary)' }"
                     >Lo antes posible</button>
                     <button
                         @click="showSchedule = true; if (!scheduledAt && timeSlots.length) scheduledAt = timeSlots[0].value"
                         class="flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all"
-                        :class="showSchedule ? 'bg-[#FF5722]/10 border-[#FF5722] text-[#FF5722]' : 'border-gray-100 text-gray-600'"
+                        :style="showSchedule ? { backgroundColor: 'var(--color-secondary-light)', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)' } : { borderColor: 'var(--color-border-light)', color: 'var(--color-text-secondary)' }"
                     >Programar</button>
                 </div>
 
                 <div v-if="showSchedule" class="mt-3">
-                    <p class="text-xs text-gray-400 mb-2">Hoy</p>
+                    <p class="text-xs mb-2" :style="{ color: 'var(--color-text-muted)' }">Hoy</p>
                     <div v-if="timeSlots.length" class="flex flex-wrap gap-2">
                         <button
                             v-for="slot in timeSlots"
@@ -379,11 +395,14 @@ function formatPrice(v) {
                             @click="scheduledAt = slot.value"
                             class="px-4 py-2 rounded-full text-sm font-medium border transition-all"
                             :class="scheduledAt === slot.value
-                                ? 'bg-[#FF5722] text-white border-[#FF5722] shadow-md shadow-orange-200'
-                                : 'bg-gray-50 text-gray-700 border-gray-200'"
+                                ? 'shadow-md'
+                                : ''"
+                            :style="scheduledAt === slot.value
+                                ? { backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)', borderColor: 'var(--color-secondary)', boxShadow: '0 4px 6px -1px var(--color-secondary-ring)' }
+                                : { backgroundColor: 'var(--color-card-bg)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }"
                         >{{ slot.label }}</button>
                     </div>
-                    <p v-else class="text-xs text-gray-400 text-center py-3">Sin horarios disponibles para hoy.</p>
+                    <p v-else class="text-xs text-center py-3" :style="{ color: 'var(--color-text-muted)' }">Sin horarios disponibles para hoy.</p>
                 </div>
             </div>
 
@@ -391,22 +410,22 @@ function formatPrice(v) {
 
             <!-- Right column: order summary (desktop) -->
             <div class="hidden md:block md:w-80 md:shrink-0">
-                <div class="sticky top-[85px] bg-white border border-gray-100 rounded-2xl p-5">
-                    <h3 class="font-bold text-gray-900 mb-4">Resumen del pedido</h3>
+                <div class="sticky top-[85px] border rounded-2xl p-5" :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }">
+                    <h3 class="font-bold mb-4" :style="{ color: 'var(--color-text)' }">Resumen del pedido</h3>
 
                     <div class="space-y-2 mb-4 max-h-60 overflow-y-auto">
                         <div v-for="(item, i) in cart.items" :key="i" class="flex items-start gap-3">
                             <img v-if="item.product_image" :src="item.product_image" class="w-10 h-10 rounded-lg object-cover shrink-0" />
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 leading-snug">{{ item.quantity }}x {{ item.product_name }}</p>
-                                <p v-if="item.modifiers.length" class="text-xs text-gray-400 truncate">{{ item.modifiers.map(m => m.name).join(', ') }}</p>
+                                <p class="text-sm font-medium leading-snug" :style="{ color: 'var(--color-text)' }">{{ item.quantity }}x {{ item.product_name }}</p>
+                                <p v-if="item.modifiers.length" class="text-xs truncate" :style="{ color: 'var(--color-text-muted)' }">{{ item.modifiers.map(m => m.name).join(', ') }}</p>
                             </div>
-                            <span class="text-sm font-semibold text-gray-700 shrink-0">{{ formatPrice(item.item_total) }}</span>
+                            <span class="text-sm font-semibold shrink-0" :style="{ color: 'var(--color-text)' }">{{ formatPrice(item.item_total) }}</span>
                         </div>
                     </div>
 
-                    <div class="border-t border-gray-100 pt-3 space-y-1 mb-4">
-                        <div class="flex justify-between text-sm text-gray-600">
+                    <div class="border-t pt-3 space-y-1 mb-4" :style="{ borderColor: 'var(--color-border-light)' }">
+                        <div class="flex justify-between text-sm" :style="{ color: 'var(--color-text-secondary)' }">
                             <span>Subtotal</span>
                             <span>{{ formatPrice(cart.subtotal) }}</span>
                         </div>
@@ -417,8 +436,11 @@ function formatPrice(v) {
                         :disabled="!canProceed"
                         class="w-full py-3 rounded-xl text-sm font-semibold transition-colors"
                         :class="canProceed
-                            ? 'bg-[#FF5722] text-white hover:bg-[#D84315]'
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+                            ? 'hover:brightness-90'
+                            : 'cursor-not-allowed'"
+                        :style="canProceed
+                            ? { backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)' }
+                            : { backgroundColor: 'var(--color-border)', color: 'var(--color-text-muted)' }"
                     >
                         {{ proceeding ? 'Verificando cobertura...' : 'Continuar al pago' }}
                     </button>
@@ -433,7 +455,9 @@ function formatPrice(v) {
             <button
                 @click="proceed"
                 :disabled="!canProceed"
-                class="w-full bg-[#FF5722] text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-orange-500/30 active:scale-[0.98] transition-transform disabled:opacity-40"
+                class="w-full rounded-2xl py-4 font-bold text-base shadow-lg active:scale-[0.98] transition-transform disabled:opacity-40"
+                style="box-shadow: 0 10px 15px -3px var(--color-secondary-ring)"
+                :style="{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)' }"
             >
                 {{ proceeding ? 'Verificando cobertura...' : 'Continuar al pago' }}
             </button>

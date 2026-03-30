@@ -90,9 +90,10 @@ function resendWhatsapp() {
         <header class="flex items-center p-4 pb-2 z-10">
             <button
                 @click="goBack"
-                class="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                class="w-9 h-9 flex items-center justify-center rounded-full border transition-colors"
+                :style="{ backgroundColor: 'var(--color-card-bg)', borderColor: 'var(--color-border-light)' }"
             >
-                <span class="material-symbols-outlined text-2xl" :style="{ color: 'var(--color-text)' }">close</span>
+                <span class="material-symbols-outlined text-xl" :style="{ color: 'var(--color-text-secondary)' }">close</span>
             </button>
             <h1 class="text-lg font-bold tracking-tight flex-1 text-center pr-10" :style="{ color: 'var(--color-text)' }">
                 {{ restaurantStore.restaurant?.name ?? '' }}
@@ -106,7 +107,7 @@ function resendWhatsapp() {
             <div class="flex flex-col items-center gap-6 mt-8">
                 <div class="w-32 h-32 rounded-full flex items-center justify-center animate-pulse" style="background-color: var(--color-secondary-light)">
                     <div class="w-24 h-24 rounded-full flex items-center justify-center shadow-lg" :style="{ backgroundColor: 'var(--color-secondary)', boxShadow: '0 10px 15px -3px var(--color-secondary-ring)' }">
-                        <span class="material-symbols-outlined text-white !text-[64px]">check</span>
+                        <span class="material-symbols-outlined !text-[64px]" :style="{ color: 'var(--color-text-on-secondary)' }">check</span>
                     </div>
                 </div>
                 <div class="flex flex-col items-center gap-2 text-center">
@@ -144,7 +145,7 @@ function resendWhatsapp() {
                         class="flex justify-between items-start"
                     >
                         <div class="flex gap-3">
-                            <span class="bg-gray-100 font-bold text-xs h-6 w-6 rounded flex items-center justify-center mt-0.5" :style="{ color: 'var(--color-text-secondary)' }">
+                            <span class="font-bold text-xs h-6 w-6 rounded flex items-center justify-center mt-0.5" :style="{ backgroundColor: 'var(--color-border-light)', color: 'var(--color-text-secondary)' }">
                                 {{ item.quantity }}
                             </span>
                             <div class="flex flex-col">
@@ -160,7 +161,7 @@ function resendWhatsapp() {
                 </div>
 
                 <!-- Totals -->
-                <div class="p-4 bg-gray-50">
+                <div class="p-4" :style="{ backgroundColor: 'var(--color-border-light)' }">
                     <div class="flex justify-between items-center mb-1">
                         <p class="text-sm" :style="{ color: 'var(--color-text-secondary)' }">Subtotal</p>
                         <p class="text-sm font-medium" :style="{ color: 'var(--color-text)' }">${{ summary.subtotal.toFixed(2) }}</p>
@@ -194,8 +195,8 @@ function resendWhatsapp() {
                 </button>
                 <button
                     @click="goBack"
-                    class="w-full h-12 rounded-full text-white font-bold text-base tracking-wide shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:brightness-90"
-                    :style="{ backgroundColor: 'var(--color-secondary)', boxShadow: '0 10px 15px -3px var(--color-secondary-ring)' }"
+                    class="w-full py-4 rounded-2xl font-bold text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 hover:brightness-90"
+                    :style="{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-text-on-secondary)', boxShadow: '0 10px 15px -3px var(--color-secondary-ring)' }"
                 >
                     Volver al menú
                 </button>

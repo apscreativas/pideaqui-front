@@ -120,8 +120,8 @@ onUnmounted(() => {
             v-if="!mapLoaded && !mapError"
             class="absolute inset-0 flex flex-col items-center justify-center bg-gray-100"
         >
-            <div class="w-8 h-8 rounded-full border-4 border-gray-200 border-t-[#FF5722] animate-spin mb-2"></div>
-            <p class="text-xs text-gray-500">Cargando mapa...</p>
+            <div class="w-8 h-8 rounded-full border-4 animate-spin mb-2" :style="{ borderColor: 'var(--color-border)', borderTopColor: 'var(--color-secondary)' }"></div>
+            <p class="text-xs" :style="{ color: 'var(--color-text-secondary)' }">Cargando mapa...</p>
         </div>
 
         <!-- Fallback: no API key or error -->
@@ -129,17 +129,17 @@ onUnmounted(() => {
             v-if="mapError"
             class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 px-4 text-center"
         >
-            <span class="material-symbols-outlined text-gray-300 text-4xl mb-2">map</span>
-            <p class="text-xs text-gray-500 mb-1">Mapa no disponible</p>
-            <p class="text-xs text-gray-400">{{ mapError }}</p>
-            <div v-if="lat && lng" class="mt-2 text-xs font-mono text-gray-500">
+            <span class="material-symbols-outlined text-4xl mb-2" :style="{ color: 'var(--color-text-muted)' }">map</span>
+            <p class="text-xs mb-1" :style="{ color: 'var(--color-text-secondary)' }">Mapa no disponible</p>
+            <p class="text-xs" :style="{ color: 'var(--color-text-muted)' }">{{ mapError }}</p>
+            <div v-if="lat && lng" class="mt-2 text-xs font-mono" :style="{ color: 'var(--color-text-secondary)' }">
                 {{ lat?.toFixed(6) }}, {{ lng?.toFixed(6) }}
             </div>
         </div>
 
         <!-- Fixed center pin (CSS overlay, not a Google marker) -->
         <div v-if="mapLoaded" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10">
-            <span class="material-symbols-outlined text-[#FF5722] text-4xl drop-shadow-lg" style="font-variation-settings:'FILL' 1">location_on</span>
+            <span class="material-symbols-outlined text-4xl drop-shadow-lg" :style="{ color: 'var(--color-secondary)', fontVariationSettings: `'FILL' 1` }">location_on</span>
         </div>
 
         <!-- Pin hint overlay (shown when loaded) -->

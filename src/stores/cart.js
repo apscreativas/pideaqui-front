@@ -25,6 +25,11 @@ export const useCartStore = defineStore('cart', () => {
         items.value.reduce((sum, item) => sum + item.quantity, 0),
     )
 
+    function modifierKey(m) {
+        if (m.modifier_option_template_id) { return 'cat_' + m.modifier_option_template_id }
+        return 'inl_' + (m.modifier_option_id || 0)
+    }
+
     function addItem(product, selectedModifiers, quantity, notes) {
         const price = Number(product.price)
         const modifiersTotal = selectedModifiers.reduce((s, m) => s + m.price_adjustment, 0)
@@ -40,8 +45,8 @@ export const useCartStore = defineStore('cart', () => {
         const existingIndex = items.value.findIndex((i) =>
             i.product_id === productId &&
             i.promotion_id === promotionId &&
-            JSON.stringify(i.modifiers.map((m) => m.modifier_option_id).sort()) ===
-            JSON.stringify(selectedModifiers.map((m) => m.modifier_option_id).sort()) &&
+            JSON.stringify(i.modifiers.map((m) => modifierKey(m)).sort()) ===
+            JSON.stringify(selectedModifiers.map((m) => modifierKey(m)).sort()) &&
             i.notes === notes,
         )
 
